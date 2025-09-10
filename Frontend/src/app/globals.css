@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom markdown styling */
+.prose {
+  line-height: 1.6;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.prose h2 {
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.prose ul {
+  padding-left: 0;
+}
+
+.prose li {
+  margin: 0.5rem 0;
+}
+
+.prose p {
+  margin-bottom: 1rem;
+}
+
+.prose table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.prose table td, .prose table th {
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .max-w-6xl {
+    max-width: 100%;
+  }
+
+  .w-\[85\%\] {
+    width: 95%;
+  }
+}
