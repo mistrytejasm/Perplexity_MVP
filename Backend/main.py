@@ -56,7 +56,7 @@ async def chat_stream(message: str, checkpoint_id: str = None):
             await asyncio.sleep(0.2)
             
             # STEP 1: Progressive Query Analysis
-            logger.info("🧠 Starting query analysis...")
+            logger.info("Starting query analysis...")
             request = SearchRequest(query=message)
             
             # Analyze query to get sub-queries
@@ -84,7 +84,7 @@ async def chat_stream(message: str, checkpoint_id: str = None):
                     await asyncio.sleep(0.4)  # Delay between each query
             
             # STEP 2: Progressive Web Search
-            logger.info("🔍 Starting web searches...")
+            logger.info("Starting web searches...")
             
             # Transition to "Reading sources" phase
             reading_start_data = {'type': 'reading_start'}
@@ -100,7 +100,7 @@ async def chat_stream(message: str, checkpoint_id: str = None):
             
             # Process each search term and send sources as they come
             for i, search_term in enumerate(search_terms):
-                logger.info(f"🔍 Searching for: {search_term}")
+                logger.info(f"Searching for: {search_term}")
                 
                 # Execute single search
                 search_results = await search_orchestrator.tavily_service._single_search(search_term, 2)
@@ -130,7 +130,7 @@ async def chat_stream(message: str, checkpoint_id: str = None):
                             continue
             
             # STEP 3: Generate Response
-            logger.info("✍️ Starting response generation...")
+            logger.info("Starting response generation...")
             
             # Send writing phase start
             writing_start_data = {'type': 'writing_start'}
