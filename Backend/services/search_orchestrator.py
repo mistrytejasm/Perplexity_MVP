@@ -131,4 +131,3 @@ class SearchOrchestrator:
             return 4  # Complex queries: 4 searches
 
 
-

@@ -1,5 +1,4 @@
 import React from 'react';
-
 const PremiumTypingAnimation = () => {
     return (
         <div className="flex items-center">
@@ -14,10 +13,8 @@ const PremiumTypingAnimation = () => {
         </div>
     );
 };
-
 const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
     if (!searchInfo || !searchInfo.stages || searchInfo.stages.length === 0) return null;
-
     return (
         <div className="mb-3 mt-1 relative pl-4">
             <div className="flex flex-col space-y-4 text-sm text-gray-700">
@@ -59,7 +56,6 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                         </div>
                     </div>
                 )}
-
                 {searchInfo.stages.includes('reading') && (
                     <div className="relative">
                         <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-teal-400 rounded-full z-10 shadow-sm"></div>
@@ -95,7 +91,6 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                                     </div>
                                 </div>
                             )}
-
                             {/* Show count if many sources */}
                             {((searchInfo.webSources?.length || 0) + (searchInfo.documentSources?.length || 0)) > 8 && (
                                 <div className="pl-2 mt-2 text-xs text-gray-500">
@@ -105,14 +100,12 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                         </div>
                     </div>
                 )}
-
                 {searchInfo.stages.includes('writing') && (
                     <div className="relative">
                         <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-teal-400 rounded-full z-10 shadow-sm"></div>
                         <span className="font-medium pl-2">Writing answer</span>
                     </div>
                 )}
-
                 {searchInfo.stages.includes('error') && (
                     <div className="relative">
                         <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-red-400 rounded-full z-10 shadow-sm"></div>
@@ -126,18 +119,15 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
         </div>
     );
 };
-
 // Enhanced markdown parser with proper table support
 const parseMarkdown = (content: string) => {
     if (!content) return content;
-
     // Clean up the content first
     let cleanContent = content
         .replace(/^\|[-\s:]+\|$/gm, '')
         .replace(/^[-\s]+$/gm, '')
         .replace(/\n\s*\n\s*\n/g, '\n\n')
         .trim();
-
     const lines = cleanContent.split('\n');
     const parsed: JSX.Element[] = [];
     let listItems: string[] = [];
@@ -145,7 +135,6 @@ const parseMarkdown = (content: string) => {
     let tableRows: string[][] = [];
     let inTable = false;
     let tableHeaders: string[] = [];
-
     const flushList = () => {
         if (listItems.length > 0) {
             parsed.push(
@@ -162,7 +151,6 @@ const parseMarkdown = (content: string) => {
         }
         inList = false;
     };
-
     const flushTable = () => {
         if (tableRows.length > 0) {
             parsed.push(
@@ -198,34 +186,67 @@ const parseMarkdown = (content: string) => {
         }
         inTable = false;
     };
-
     const formatInlineMarkdown = (text: string): JSX.Element => {
-        let parts = text.split(/(\*\*.*?\*\*)/g);
-        return (
-            <span>
-                {parts.map((part, idx) => {
-                    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-                        return <strong key={idx} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
-                    }
-                    if (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**')) {
-                        return <em key={idx} className="italic">{part.slice(1, -1)}</em>;
-                    }
-                    return part;
-                })}
-            </span>
-        );
-    };
+        if (!text) return <span></span>;
+        const elements: (string | JSX.Element)[] = [];
+        // Step 1: Handle clickable citations [1](url)
+        const citationRegex = /\[(\d+)\]\((https?:\/\/[^\s)]+)\)/g;
+        let lastIndex = 0;
+        let match;
+        while ((match = citationRegex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                elements.push(text.substring(lastIndex, match.index));
+            }
+            const citationNumber = match[1];
+            const citationUrl = match[2];
+            elements.push(
+                <a
+                    key={`citation-${match.index}`}
+                    href={citationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center w-6 h-6 text-xs bg-blue-100 text-blue-700 rounded border border-blue-300 hover:bg-blue-200 transition-colors duration-150 ml-1 no-underline font-medium"
+                    title={`Source: ${citationUrl}`}
+                >
+                    {citationNumber}
+                </a>
+            );
+            lastIndex = citationRegex.lastIndex;
+        }
+        if (lastIndex < text.length) {
+            elements.push(text.substring(lastIndex));
+        }
+        // Step 2: Apply bold/italic inside each chunk
+        const renderWithStyles = (chunk: string | JSX.Element, idx: number) => {
+            if (typeof chunk !== "string") return chunk;
+            return chunk.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, innerIdx) => {
 
+                if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+                    return (
+                        <strong key={`${idx}-${innerIdx}`} className="font-semibold text-gray-900">
+                            {part.slice(2, -2)}
+                        </strong>
+                    );
+                }
+                if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
+                    return (
+                        <em key={`${idx}-${innerIdx}`} className="italic">
+                            {part.slice(1, -1)}
+                        </em>
+                    );
+                }
+                return part;
+            });
+        };
+        return <span>{elements.map((el, idx) => renderWithStyles(el, idx))}</span>;
+    };
     lines.forEach((line, index) => {
         const trimmed = line.trim();
-
         if (!trimmed || /^[-\s|:]+$/.test(trimmed)) {
             return;
         }
-
         if (trimmed.includes('|') && trimmed.split('|').length > 2) {
             const cells = trimmed.split('|').map(cell => cell.trim()).filter(cell => cell.length > 0);
-
             if (cells.length > 0) {
                 if (!inTable) {
                     flushList();
@@ -239,7 +260,6 @@ const parseMarkdown = (content: string) => {
         } else {
             flushTable();
         }
-
         if (trimmed.startsWith('## ')) {
             flushList();
             flushTable();
@@ -281,13 +301,10 @@ const parseMarkdown = (content: string) => {
             );
         }
     });
-
     flushList();
     flushTable();
-
     return <div className="space-y-1">{parsed}</div>;
 };
-
 interface Message {
     id: number;
     content: string;
@@ -296,11 +313,9 @@ interface Message {
     isLoading?: boolean;
     searchInfo?: any;
 }
-
 interface MessageAreaProps {
     messages: Message[];
 }
-
 const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
     return (
         <div className="flex-grow overflow-y-auto bg-[#FCFCF8] border-b border-gray-100" style={{ minHeight: 0 }}>
@@ -311,7 +326,6 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
                             {!message.isUser && message.searchInfo && (
                                 <SearchStages searchInfo={message.searchInfo} />
                             )}
-
                             <div
                                 className={`rounded-lg py-3 px-4 ${message.isUser
                                     ? 'bg-gradient-to-br from-[#5E507F] to-[#4A3F71] text-white rounded-br-none shadow-md'
@@ -337,5 +351,4 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
         </div>
     );
 };
-
 export default MessageArea;
