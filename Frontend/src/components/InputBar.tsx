@@ -1,7 +1,8 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Paperclip, Send } from 'lucide-react';
+import { Paperclip, Send, Mic } from 'lucide-react';
+import TextareaAutosize from 'react-textarea-autosize';
 import FileUpload from './FileUpload';
 import DocumentManager from './DocumentManager';
 import { useFileUpload } from '../hooks/useFileUpload';
@@ -10,14 +11,14 @@ interface InputBarProps {
   currentMessage: string;
   setCurrentMessage: (message: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  centered?: boolean; // 🔧 NEW: Support centered mode
+  centered?: boolean;
 }
 
 const InputBar: React.FC<InputBarProps> = ({ 
   currentMessage, 
   setCurrentMessage, 
   onSubmit,
-  centered = false // 🔧 NEW: Default to bottom layout
+  centered = false
 }) => {
   const [showFileUpload, setShowFileUpload] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -30,7 +31,7 @@ const InputBar: React.FC<InputBarProps> = ({
     removeDocument
   } = useFileUpload();
 
-  // 🔧 NEW: Auto-focus input when centered
+  // Auto-focus input when centered
   useEffect(() => {
     if (centered && textareaRef.current) {
       textareaRef.current.focus();
@@ -50,20 +51,28 @@ const InputBar: React.FC<InputBarProps> = ({
     setShowFileUpload(!showFileUpload);
   };
 
-  // 🔧 NEW: Different container styles based on mode
+  // 🔧 NEW: Handle submit from button click
+  const handleSendClick = () => {
+    if (currentMessage.trim()) {
+      const syntheticEvent = {
+        preventDefault: () => {}
+      } as React.FormEvent;
+      onSubmit(syntheticEvent);
+    }
+  };
+
+  // Container styles based on mode
   const containerClasses = centered 
-    ? "w-full" // Full width when centered
+    ? "w-full" 
     : "bg-[#FCFCF8] border-t border-gray-200 backdrop-blur-sm bg-opacity-95 shadow-lg";
 
   const innerContainerClasses = centered
-    ? "w-full" // Full width when centered  
+    ? "w-full"  
     : "max-w-3xl mx-auto px-4 py-4";
 
   const inputClasses = centered
-    ? "w-full px-4 py-3 text-base" // Smaller padding and text
+    ? "w-full px-6 py-4 text-lg" 
     : "px-4 py-3";
-
-  
 
   return (
     <div className={containerClasses}>
@@ -85,60 +94,73 @@ const InputBar: React.FC<InputBarProps> = ({
           </div>
         )}
 
-        {/* Input Form */}
-        <form onSubmit={onSubmit} className="flex items-center gap-3">
-          {/* Textarea Container */}
-          <div className="flex-1 flex items-center bg-white border border-gray-300 rounded-xl shadow-sm">
-            <textarea
+        {/* 🔧 NEW: Perplexity-style Input Container */}
+        <div className="relative">
+          {/* Full Width Textarea - No Send Button on Side */}
+          <form onSubmit={onSubmit}>
+            <TextareaAutosize
               ref={textareaRef}
               value={currentMessage}
               onChange={(e) => setCurrentMessage(e.target.value)}
               placeholder={
                 centered 
-                  ? "Ask me anything..." 
+                  ? "Ask anything..." 
                   : uploadedDocuments.length > 0 
                     ? "Ask questions about your documents..." 
-                    : "Ask a follow-up..."
+                    : "Ask anything or @mention a Space"
               }
-              className={`flex-1 ${inputClasses} bg-transparent resize-none focus:outline-none max-h-32`}
-              rows={1}
-              style={{ 
-                minHeight: centered ? '48px' : '48px',
-                lineHeight: '1.5'
-              }}
+              minRows={1}
+              maxRows={centered ? 8 : 5}
+              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:border-transparent shadow-sm`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   onSubmit(e);
                 }
               }}
+              style={{
+                lineHeight: '1.5'
+              }}
             />
-            
+          </form>
+
+          {/* 🔧 NEW: Bottom Button Bar (Like Perplexity) */}
+          <div className="absolute bottom-3 right-4 flex items-center space-x-3">
             {/* Attachment Button */}
             <button
               type="button"
               onClick={handleAttachmentClick}
-              className={`p-2 m-1 rounded-md transition-colors flex-shrink-0 ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
                 showFileUpload 
-                  ? 'text-[#5E507F] bg-purple-100' 
-                  : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                  ? 'bg-[#5E507F] text-white' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
               title="Upload document"
             >
               <Paperclip className="w-4 h-4" />
             </button>
-          </div>
 
-          {/* Send Button */}
-          <button
-            type="submit"
-            disabled={!currentMessage.trim()}
-            className={`${centered ? 'h-12 px-6' : 'h-12 px-6'} bg-gradient-to-r from-[#5E507F] to-[#4A3F71] text-white rounded-xl hover:from-[#524670] hover:to-[#3E3566] focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-md flex-shrink-0`}
-          >
-            <Send className="w-4 h-4" />
-            <span>Send</span>
-          </button>
-        </form>
+            {/* Microphone Button */}
+            <button
+              type="button"
+              className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
+              title="Voice input"
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+
+            {/* Send Button (Small & Round) */}
+            <button
+              type="button"
+              onClick={handleSendClick}
+              disabled={!currentMessage.trim()}
+              className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5E507F] to-[#4A3F71] text-white hover:from-[#524670] hover:to-[#3E3566] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
+              title="Send message"
+            >
+              <Send className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
 
         {/* Upload Status Indicator */}
         {uploadedDocuments.length > 0 && (
