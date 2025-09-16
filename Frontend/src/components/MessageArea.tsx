@@ -318,14 +318,18 @@ interface MessageAreaProps {
 }
 const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
     return (
-        <div className="flex-grow overflow-y-auto bg-[#FCFCF8] border-b border-gray-100" style={{ minHeight: 0 }}>
-            <div className="max-w-6xl mx-auto p-4">
+        <div className="bg-[#FCFCF8] px-4 py-6">
+            {/* Center the conversation with max width like Perplexity */}
+            <div className="max-w-3xl mx-auto">
                 {messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-                        <div className={`flex flex-col ${message.isUser ? 'max-w-md' : 'max-w-5xl w-full'}`}>
+                    <div key={message.id} className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-6`}>
+                        <div className={`flex flex-col ${message.isUser ? 'max-w-md' : 'max-w-full w-full'}`}>
+                            {/* Search Status Display */}
                             {!message.isUser && message.searchInfo && (
                                 <SearchStages searchInfo={message.searchInfo} />
                             )}
+
+                            {/* Message Content */}
                             <div
                                 className={`rounded-lg py-3 px-4 ${message.isUser
                                     ? 'bg-gradient-to-br from-[#5E507F] to-[#4A3F71] text-white rounded-br-none shadow-md'
@@ -347,8 +351,12 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
                         </div>
                     </div>
                 ))}
+                
+                {/* Extra bottom spacing so last message isn't hidden behind fixed input */}
+                <div className="h-6"></div>
             </div>
         </div>
     );
 };
+
 export default MessageArea;

@@ -1,6 +1,5 @@
 "use client"
 
-import Header from '@/components/Header';
 import InputBar from '@/components/InputBar';
 import MessageArea from '@/components/MessageArea';
 import React, { useState } from 'react';
@@ -368,11 +367,19 @@ const Home = () => {
   };
 
   return (
-    <div className="flex justify-center bg-gray-100 min-h-screen py-8 px-4">
-      <div className="w-[60%] bg-white flex flex-col rounded-xl shadow-lg border border-gray-100 overflow-hidden h-[90vh]">
-        <Header />
+    <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
+      {/* Message Area - Full height with bottom padding for fixed input */}
+      <div className="flex-1 overflow-y-auto pb-24">
         <MessageArea messages={messages} />
-        <InputBar currentMessage={currentMessage} setCurrentMessage={setCurrentMessage} onSubmit={handleSubmit} />
+      </div>
+      
+      {/* Input Bar - Fixed at bottom of viewport */}
+      <div className="fixed bottom-0 left-0 right-0 z-10">
+        <InputBar 
+          currentMessage={currentMessage} 
+          setCurrentMessage={setCurrentMessage} 
+          onSubmit={handleSubmit} 
+        />
       </div>
     </div>
   );
