@@ -26,16 +26,10 @@ interface Message {
 }
 
 const Home = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      content: 'Hi there, how can I help you?',
-      isUser: false,
-      type: 'message'
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [checkpointId, setCheckpointId] = useState(null);
+  const [hasStartedChat, setHasStartedChat] = useState(false); // 🔧 NEW: Track if chat has started
 
   // Helper function to merge search info incrementally
   const mergeSearchInfo = (existing: SearchInfo | undefined, newData: any): SearchInfo => {
@@ -137,6 +131,12 @@ const Home = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (currentMessage.trim()) {
+
+      // 🔧 NEW: Mark that chat has started
+      if (!hasStartedChat) {
+        setHasStartedChat(true);
+      }
+
       // First add the user message to the chat
       const newMessageId = messages.length > 0 ? Math.max(...messages.map(msg => msg.id)) + 1 : 1;
 
@@ -366,6 +366,33 @@ const Home = () => {
     }
   };
 
+  // 🔧 NEW: Render different layouts based on chat state
+  if (!hasStartedChat) {
+    return (
+      <div className="min-h-screen bg-[#FCFCF8] flex flex-col items-center justify-center px-6 -mt-16">
+        {/* Compact Logo/Title */}
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-semibold text-gray-800 mb-1">
+            AI Search Engine
+          </h1>
+          <p className="text-sm text-gray-500">Where Knowledge Begins</p>
+        </div>
+
+        {/* Compact Input - Choose your preferred width */}
+        <div className="w-full max-w-lg mx-8"> 
+          <InputBar 
+            currentMessage={currentMessage} 
+            setCurrentMessage={setCurrentMessage} 
+            onSubmit={handleSubmit}
+            centered={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
+
+  // Chat interface with input at bottom
   return (
     <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
       {/* Message Area - Full height with bottom padding for fixed input */}
@@ -379,10 +406,12 @@ const Home = () => {
           currentMessage={currentMessage} 
           setCurrentMessage={setCurrentMessage} 
           onSubmit={handleSubmit} 
+          centered={false} // Pass centered prop
         />
       </div>
     </div>
   );
 };
+
 
 export default Home;

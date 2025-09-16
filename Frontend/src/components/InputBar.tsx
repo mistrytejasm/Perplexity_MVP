@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Paperclip, Send } from 'lucide-react';
 import FileUpload from './FileUpload';
 import DocumentManager from './DocumentManager';
@@ -10,15 +10,17 @@ interface InputBarProps {
   currentMessage: string;
   setCurrentMessage: (message: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  centered?: boolean; // 🔧 NEW: Support centered mode
 }
 
 const InputBar: React.FC<InputBarProps> = ({ 
   currentMessage, 
   setCurrentMessage, 
-  onSubmit 
+  onSubmit,
+  centered = false // 🔧 NEW: Default to bottom layout
 }) => {
   const [showFileUpload, setShowFileUpload] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const {
     uploadedDocuments,
@@ -27,6 +29,13 @@ const InputBar: React.FC<InputBarProps> = ({
     uploadDocument,
     removeDocument
   } = useFileUpload();
+
+  // 🔧 NEW: Auto-focus input when centered
+  useEffect(() => {
+    if (centered && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [centered]);
 
   const handleFileUpload = async (file: File) => {
     const result = await uploadDocument(file);
@@ -41,10 +50,24 @@ const InputBar: React.FC<InputBarProps> = ({
     setShowFileUpload(!showFileUpload);
   };
 
+  // 🔧 NEW: Different container styles based on mode
+  const containerClasses = centered 
+    ? "w-full" // Full width when centered
+    : "bg-[#FCFCF8] border-t border-gray-200 backdrop-blur-sm bg-opacity-95 shadow-lg";
+
+  const innerContainerClasses = centered
+    ? "w-full" // Full width when centered  
+    : "max-w-3xl mx-auto px-4 py-4";
+
+  const inputClasses = centered
+    ? "w-full px-4 py-3 text-base" // Smaller padding and text
+    : "px-4 py-3";
+
+  
+
   return (
-    <div className="bg-[#FCFCF8] border-t border-gray-200 backdrop-blur-sm bg-opacity-95 shadow-lg">
-      {/* Center the input like Perplexity with max width */}
-      <div className="max-w-3xl mx-auto px-4 py-4">
+    <div className={containerClasses}>
+      <div className={innerContainerClasses}>
         {/* Document Manager */}
         <DocumentManager 
           documents={uploadedDocuments}
@@ -62,22 +85,25 @@ const InputBar: React.FC<InputBarProps> = ({
           </div>
         )}
 
-        {/* Input Form - PROPERLY ALIGNED */}
+        {/* Input Form */}
         <form onSubmit={onSubmit} className="flex items-center gap-3">
           {/* Textarea Container */}
           <div className="flex-1 flex items-center bg-white border border-gray-300 rounded-xl shadow-sm">
             <textarea
+              ref={textareaRef}
               value={currentMessage}
               onChange={(e) => setCurrentMessage(e.target.value)}
               placeholder={
-                uploadedDocuments.length > 0 
-                  ? "Ask questions about your documents..." 
-                  : "Ask me anything..."
+                centered 
+                  ? "Ask me anything..." 
+                  : uploadedDocuments.length > 0 
+                    ? "Ask questions about your documents..." 
+                    : "Ask a follow-up..."
               }
-              className="flex-1 px-4 py-3 bg-transparent resize-none focus:outline-none max-h-32"
+              className={`flex-1 ${inputClasses} bg-transparent resize-none focus:outline-none max-h-32`}
               rows={1}
               style={{ 
-                minHeight: '48px',
+                minHeight: centered ? '48px' : '48px',
                 lineHeight: '1.5'
               }}
               onKeyDown={(e) => {
@@ -88,7 +114,7 @@ const InputBar: React.FC<InputBarProps> = ({
               }}
             />
             
-            {/* Attachment Button - Inside textarea container */}
+            {/* Attachment Button */}
             <button
               type="button"
               onClick={handleAttachmentClick}
@@ -103,17 +129,16 @@ const InputBar: React.FC<InputBarProps> = ({
             </button>
           </div>
 
-          {/* Send Button - Same height as textarea container */}
+          {/* Send Button */}
           <button
             type="submit"
-            disabled={!currentMessage.trim() && uploadedDocuments.length === 0}
-            className="h-12 px-6 bg-gradient-to-r from-[#5E507F] to-[#4A3F71] text-white rounded-xl hover:from-[#524670] hover:to-[#3E3566] focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-md flex-shrink-0"
+            disabled={!currentMessage.trim()}
+            className={`${centered ? 'h-12 px-6' : 'h-12 px-6'} bg-gradient-to-r from-[#5E507F] to-[#4A3F71] text-white rounded-xl hover:from-[#524670] hover:to-[#3E3566] focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-md flex-shrink-0`}
           >
             <Send className="w-4 h-4" />
             <span>Send</span>
           </button>
         </form>
-
 
         {/* Upload Status Indicator */}
         {uploadedDocuments.length > 0 && (
