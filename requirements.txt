@@ -1,0 +1,2 @@
+# npm install @types/react-syntax-highlighter
+# npm install react-syntax-highlighter

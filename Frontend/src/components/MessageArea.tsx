@@ -1,4 +1,7 @@
 import React from 'react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
 const PremiumTypingAnimation = () => {
     return (
         <div className="flex items-center">
@@ -119,15 +122,17 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
         </div>
     );
 };
-// Enhanced markdown parser with proper table support
+// Enhanced markdown parser with FIXED syntax
 const parseMarkdown = (content: string) => {
     if (!content) return content;
+
     // Clean up the content first
     let cleanContent = content
         .replace(/^\|[-\s:]+\|$/gm, '')
         .replace(/^[-\s]+$/gm, '')
         .replace(/\n\s*\n\s*\n/g, '\n\n')
         .trim();
+
     const lines = cleanContent.split('\n');
     const parsed: JSX.Element[] = [];
     let listItems: string[] = [];
@@ -135,13 +140,17 @@ const parseMarkdown = (content: string) => {
     let tableRows: string[][] = [];
     let inTable = false;
     let tableHeaders: string[] = [];
+    let codeBlock: string[] = [];
+    let inCodeBlock = false;
+    let codeLanguage = '';
+
     const flushList = () => {
         if (listItems.length > 0) {
             parsed.push(
-                <ul key={`list-${parsed.length}`} className="list-none space-y-1.5 mb-3 ml-0">
+                <ul key={`list-${parsed.length}`} className="list-none space-y-2 mb-4 ml-0">
                     {listItems.map((item, idx) => (
                         <li key={idx} className="flex items-start">
-                            <span className="text-teal-500 mr-3 mt-0.5 flex-shrink-0 text-sm">•</span>
+                            <span className="text-teal-500 mr-3 mt-0.5 flex-shrink-0 text-sm">- </span>
                             <span className="text-gray-700 leading-relaxed text-sm">{formatInlineMarkdown(item)}</span>
                         </li>
                     ))}
@@ -151,16 +160,17 @@ const parseMarkdown = (content: string) => {
         }
         inList = false;
     };
+
     const flushTable = () => {
         if (tableRows.length > 0) {
             parsed.push(
-                <div key={`table-${parsed.length}`} className="overflow-x-auto mb-4">
-                    <table className="min-w-full border border-gray-200 rounded-lg shadow-sm">
+                <div key={`table-${parsed.length}`} className="overflow-x-auto mb-6 rounded-lg border border-gray-200">
+                    <table className="min-w-full">
                         {tableHeaders.length > 0 && (
                             <thead className="bg-gray-50">
                                 <tr>
                                     {tableHeaders.map((header, idx) => (
-                                        <th key={idx} className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                                        <th key={idx} className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
                                             {formatInlineMarkdown(header.trim())}
                                         </th>
                                     ))}
@@ -171,7 +181,7 @@ const parseMarkdown = (content: string) => {
                             {tableRows.map((row, rowIdx) => (
                                 <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                     {row.map((cell, cellIdx) => (
-                                        <td key={cellIdx} className="px-4 py-3 text-sm text-gray-700 border-b border-gray-100">
+                                        <td key={cellIdx} className="px-6 py-4 text-sm text-gray-700">
                                             {formatInlineMarkdown(cell.trim())}
                                         </td>
                                     ))}
@@ -186,65 +196,184 @@ const parseMarkdown = (content: string) => {
         }
         inTable = false;
     };
-    const formatInlineMarkdown = (text: string): JSX.Element => {
-        if (!text) return <span></span>;
-        const elements: (string | JSX.Element)[] = [];
-        // Step 1: Handle clickable citations [1](url)
-        const citationRegex = /\[(\d+)\]\((https?:\/\/[^\s)]+)\)/g;
-        let lastIndex = 0;
-        let match;
-        while ((match = citationRegex.exec(text)) !== null) {
-            if (match.index > lastIndex) {
-                elements.push(text.substring(lastIndex, match.index));
-            }
-            const citationNumber = match[1];
-            const citationUrl = match[2];
-            elements.push(
-                <a
-                    key={`citation-${match.index}`}
-                    href={citationUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center w-6 h-6 text-xs bg-blue-100 text-blue-700 rounded border border-blue-300 hover:bg-blue-200 transition-colors duration-150 ml-1 no-underline font-medium"
-                    title={`Source: ${citationUrl}`}
-                >
-                    {citationNumber}
-                </a>
-            );
-            lastIndex = citationRegex.lastIndex;
-        }
-        if (lastIndex < text.length) {
-            elements.push(text.substring(lastIndex));
-        }
-        // Step 2: Apply bold/italic inside each chunk
-        const renderWithStyles = (chunk: string | JSX.Element, idx: number) => {
-            if (typeof chunk !== "string") return chunk;
-            return chunk.split(/(\*\*.*?\*\*|\*.*?\*)/g).map((part, innerIdx) => {
 
-                if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
-                    return (
-                        <strong key={`${idx}-${innerIdx}`} className="font-semibold text-gray-900">
-                            {part.slice(2, -2)}
-                        </strong>
-                    );
-                }
-                if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
-                    return (
-                        <em key={`${idx}-${innerIdx}`} className="italic">
-                            {part.slice(1, -1)}
-                        </em>
-                    );
-                }
-                return part;
-            });
-        };
-        return <span>{elements.map((el, idx) => renderWithStyles(el, idx))}</span>;
+    // 🔧 FIXED: Flush code blocks with syntax highlighting
+    const flushCodeBlock = () => {
+        if (codeBlock.length > 0) {
+            const codeString = codeBlock.join('\n');
+            parsed.push(
+                <div key={`code-${parsed.length}`} className="relative mb-6 rounded-lg overflow-hidden border border-gray-200 shadow-sm group">
+                    {/* Language label */}
+                    {codeLanguage && (
+                        <div className="bg-gray-800 text-gray-200 text-xs px-3 py-1 font-mono">
+                            {codeLanguage}
+                        </div>
+                    )}
+                    
+                    {/* Code block with syntax highlighting */}
+                    <SyntaxHighlighter
+                        language={codeLanguage || 'text'}
+                        style={vscDarkPlus}
+                        showLineNumbers={codeString.split('\n').length > 3}
+                        wrapLines={true}
+                        customStyle={{
+                            margin: 0,
+                            fontSize: '14px',
+                            lineHeight: '1.5',
+                            padding: '16px'
+                        }}
+                    >
+                        {codeString}
+                    </SyntaxHighlighter>
+                    
+                    {/* Copy button */}
+                    <button
+                        className="absolute top-2 right-2 p-2 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                        onClick={() => navigator.clipboard.writeText(codeString)}
+                        title="Copy code"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                    </button>
+                </div>
+            );
+            codeBlock = [];
+            codeLanguage = '';
+        }
+        inCodeBlock = false;
     };
+
+    const formatInlineMarkdown = (text: string): JSX.Element => {
+    if (!text) return <span></span>;
+    
+    // First, handle citations [1](url)
+    const elements: (string | JSX.Element)[] = [];
+    const citationRegex = /\[(\d+)\]\((https?:\/\/[^\s)]+)\)/g;
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = citationRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            elements.push(text.substring(lastIndex, match.index));
+        }
+        const citationNumber = match[1];
+        const citationUrl = match[2];
+        elements.push(
+            <a
+                key={`citation-${match.index}`}
+                href={citationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center w-6 h-6 text-xs bg-blue-100 text-blue-700 rounded border border-blue-300 hover:bg-blue-200 transition-colors duration-150 ml-1 no-underline font-medium"
+                title={`Source: ${citationUrl}`}
+            >
+                {citationNumber}
+            </a>
+        );
+        lastIndex = citationRegex.lastIndex;
+    }
+    
+    if (lastIndex < text.length) {
+        elements.push(text.substring(lastIndex));
+    }
+    
+    // Process each element for inline formatting
+    const processInlineFormatting = (textChunk: string, keyPrefix: number): (string | JSX.Element)[] => {
+        if (!textChunk || typeof textChunk !== 'string') return [textChunk];
+        
+        const results: (string | JSX.Element)[] = [];
+        
+        // Combined regex for bold, italic, and inline code
+        const inlineRegex = /(\*\*[^*]+\*\*)|(\*[^*]+\*)|(`[^`]+`)/g;
+        let lastIdx = 0;
+        let inlineMatch;
+        
+        while ((inlineMatch = inlineRegex.exec(textChunk)) !== null) {
+            // Add text before match
+            if (inlineMatch.index > lastIdx) {
+                results.push(textChunk.substring(lastIdx, inlineMatch.index));
+            }
+            
+            if (inlineMatch[1]) {
+                // Bold: **text**
+                results.push(
+                    <strong key={`${keyPrefix}-bold-${inlineMatch.index}`} className="font-semibold text-gray-900">
+                        {inlineMatch[1].slice(2, -2)}
+                    </strong>
+                );
+            } else if (inlineMatch[2]) {
+                // Italic: *text*
+                results.push(
+                    <em key={`${keyPrefix}-italic-${inlineMatch.index}`} className="italic">
+                        {inlineMatch[2].slice(1, -1)}
+                    </em>
+                );
+            } else if (inlineMatch[3]) {
+                // Inline code: `code`
+                results.push(
+                    <code key={`${keyPrefix}-code-${inlineMatch.index}`} className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+                        {inlineMatch[3].slice(1, -1)}
+                    </code>
+                );
+            }
+            
+            lastIdx = inlineRegex.lastIndex;
+        }
+        
+        // Add remaining text
+        if (lastIdx < textChunk.length) {
+            results.push(textChunk.substring(lastIdx));
+        }
+        
+        return results;
+    };
+    
+    // Apply inline formatting to all text elements
+    const finalElements: (string | JSX.Element)[] = [];
+    elements.forEach((element, idx) => {
+        if (typeof element === 'string') {
+            finalElements.push(...processInlineFormatting(element, idx));
+        } else {
+            finalElements.push(element);
+        }
+    });
+    
+    return <span>{finalElements}</span>;
+};
+
+
     lines.forEach((line, index) => {
         const trimmed = line.trim();
+
+        // 🔧 FIXED: Handle code block fences with proper syntax
+        if (trimmed.startsWith('```')) {
+            if (inCodeBlock) {
+                // End code block
+                flushCodeBlock();
+            } else {
+                // Start code block
+                flushList();
+                flushTable();
+                inCodeBlock = true;
+                // Extract language from ``````javascript, etc.
+                codeLanguage = trimmed.slice(3).trim() || 'text';
+            }
+            return;
+        }
+        
+        // If we're in a code block, collect the lines
+        if (inCodeBlock) {
+            codeBlock.push(line);
+            return;
+        }
+
+        // Skip empty lines or separator lines
         if (!trimmed || /^[-\s|:]+$/.test(trimmed)) {
             return;
         }
+
+        // Handle table rows
         if (trimmed.includes('|') && trimmed.split('|').length > 2) {
             const cells = trimmed.split('|').map(cell => cell.trim()).filter(cell => cell.length > 0);
             if (cells.length > 0) {
@@ -260,11 +389,13 @@ const parseMarkdown = (content: string) => {
         } else {
             flushTable();
         }
+
+        // Handle headers
         if (trimmed.startsWith('## ')) {
             flushList();
             flushTable();
             parsed.push(
-                <h2 key={`h2-${index}`} className="text-lg font-semibold text-gray-800 mb-2 mt-4 first:mt-0 pb-1 border-b border-gray-200">
+                <h2 key={`h2-${index}`} className="text-xl font-bold text-gray-900 mb-3 mt-6 first:mt-0 pb-2 border-b border-gray-200">
                     {formatInlineMarkdown(trimmed.slice(3))}
                 </h2>
             );
@@ -272,7 +403,7 @@ const parseMarkdown = (content: string) => {
             flushList();
             flushTable();
             parsed.push(
-                <h3 key={`h3-${index}`} className="text-base font-medium text-gray-800 mb-2 mt-3 first:mt-0">
+                <h3 key={`h3-${index}`} className="text-lg font-semibold text-gray-800 mb-2 mt-5 first:mt-0">
                     {formatInlineMarkdown(trimmed.slice(4))}
                 </h3>
             );
@@ -280,31 +411,40 @@ const parseMarkdown = (content: string) => {
             flushList();
             flushTable();
             parsed.push(
-                <h4 key={`h4-${index}`} className="text-sm font-medium text-gray-800 mb-1 mt-2 first:mt-0">
+                <h4 key={`h4-${index}`} className="text-base font-medium text-gray-800 mb-2 mt-4 first:mt-0">
                     {formatInlineMarkdown(trimmed.slice(5))}
                 </h4>
             );
         }
-        else if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || /^\d+\.\s/.test(trimmed)) {
+        // Handle list items
+        // Add asterisk pattern detection
+        else if (trimmed.startsWith('* ') || trimmed.startsWith('• ') || trimmed.startsWith('- ') || /^\d+\.\s/.test(trimmed)) {
             flushTable();
             inList = true;
-            const itemText = trimmed.replace(/^[•\-]\s/, '').replace(/^\d+\.\s/, '');
+            const itemText = trimmed.replace(/^[•\-\*]\s/, '').replace(/^\d+\.\s/, '');
             listItems.push(itemText);
         }
+
+        // Handle regular paragraphs
         else if (trimmed.length > 0) {
             flushList();
             flushTable();
             parsed.push(
-                <p key={`p-${index}`} className="text-gray-700 mb-2 leading-relaxed text-sm">
+                <p key={`p-${index}`} className="text-gray-700 mb-3 leading-relaxed">
                     {formatInlineMarkdown(trimmed)}
                 </p>
             );
         }
     });
+
+    // Flush any remaining items
     flushList();
     flushTable();
-    return <div className="space-y-1">{parsed}</div>;
+    flushCodeBlock();
+
+    return <div className="space-y-1 group">{parsed}</div>;
 };
+
 interface Message {
     id: number;
     content: string;
