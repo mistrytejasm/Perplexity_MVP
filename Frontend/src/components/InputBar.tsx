@@ -46,7 +46,7 @@ const InputBar: React.FC<InputBarProps> = ({
     : "max-w-3xl mx-auto px-4 py-4";
 
   const inputClasses = centered
-    ? "w-full px-6 py-4 text-lg" 
+    ? "w-full px-6 py-4 text-sm" 
     : "px-4 py-3";
 
   return (
