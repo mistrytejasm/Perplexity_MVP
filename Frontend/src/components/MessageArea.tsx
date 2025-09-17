@@ -356,7 +356,7 @@ const parseMarkdown = (content: string) => {
                 flushList();
                 flushTable();
                 inCodeBlock = true;
-                // Extract language from ``````javascript, etc.
+                // Extract language from javascript, etc.
                 codeLanguage = trimmed.slice(3).trim() || 'text';
             }
             return;
@@ -395,7 +395,7 @@ const parseMarkdown = (content: string) => {
             flushList();
             flushTable();
             parsed.push(
-                <h2 key={`h2-${index}`} className="text-xl font-bold text-gray-900 mb-3 mt-6 first:mt-0 pb-2 border-b border-gray-200">
+                <h2 key={`h2-${index}`} className="text-lg font-bold text-gray-900 mb-3 mt-6 first:mt-0 pb-2 border-b border-gray-200">
                     {formatInlineMarkdown(trimmed.slice(3))}
                 </h2>
             );
@@ -403,7 +403,7 @@ const parseMarkdown = (content: string) => {
             flushList();
             flushTable();
             parsed.push(
-                <h3 key={`h3-${index}`} className="text-lg font-semibold text-gray-800 mb-2 mt-5 first:mt-0">
+                <h3 key={`h3-${index}`} className="text-base font-semibold text-gray-800 mb-2 mt-5 first:mt-0">
                     {formatInlineMarkdown(trimmed.slice(4))}
                 </h3>
             );
@@ -411,7 +411,7 @@ const parseMarkdown = (content: string) => {
             flushList();
             flushTable();
             parsed.push(
-                <h4 key={`h4-${index}`} className="text-base font-medium text-gray-800 mb-2 mt-4 first:mt-0">
+                <h4 key={`h4-${index}`} className="text-sm font-medium text-gray-800 mb-2 mt-4 first:mt-0">
                     {formatInlineMarkdown(trimmed.slice(5))}
                 </h4>
             );
@@ -430,7 +430,7 @@ const parseMarkdown = (content: string) => {
             flushList();
             flushTable();
             parsed.push(
-                <p key={`p-${index}`} className="text-gray-700 mb-3 leading-relaxed">
+                <p key={`p-${index}`} className="text-gray-700 mb-3 leading-relaxed text-sm">
                     {formatInlineMarkdown(trimmed)}
                 </p>
             );

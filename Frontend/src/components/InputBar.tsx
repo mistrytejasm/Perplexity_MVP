@@ -1,11 +1,8 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Paperclip, Send, Mic } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
-import FileUpload from './FileUpload';
-import DocumentManager from './DocumentManager';
-import { useFileUpload } from '../hooks/useFileUpload';
 
 interface InputBarProps {
   currentMessage: string;
@@ -20,16 +17,7 @@ const InputBar: React.FC<InputBarProps> = ({
   onSubmit,
   centered = false
 }) => {
-  const [showFileUpload, setShowFileUpload] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  const {
-    uploadedDocuments,
-    uploadProgress,
-    isUploading,
-    uploadDocument,
-    removeDocument
-  } = useFileUpload();
 
   // Auto-focus input when centered
   useEffect(() => {
@@ -38,20 +26,7 @@ const InputBar: React.FC<InputBarProps> = ({
     }
   }, [centered]);
 
-  const handleFileUpload = async (file: File) => {
-    const result = await uploadDocument(file);
-    if (result.success) {
-      console.log('Document uploaded successfully:', result.document);
-    } else {
-      console.error('Upload failed:', result.error);
-    }
-  };
-
-  const handleAttachmentClick = () => {
-    setShowFileUpload(!showFileUpload);
-  };
-
-  // 🔧 NEW: Handle submit from button click
+  // Handle submit from button click
   const handleSendClick = () => {
     if (currentMessage.trim()) {
       const syntheticEvent = {
@@ -77,24 +52,7 @@ const InputBar: React.FC<InputBarProps> = ({
   return (
     <div className={containerClasses}>
       <div className={innerContainerClasses}>
-        {/* Document Manager */}
-        <DocumentManager 
-          documents={uploadedDocuments}
-          onRemoveDocument={removeDocument}
-        />
-        
-        {/* File Upload Area */}
-        {showFileUpload && (
-          <div className="mb-4">
-            <FileUpload
-              onFileUpload={handleFileUpload}
-              uploadProgress={uploadProgress}
-              isUploading={isUploading}
-            />
-          </div>
-        )}
-
-        {/* 🔧 NEW: Perplexity-style Input Container */}
+        {/* Perplexity-style Input Container */}
         <div className="relative">
           {/* Full Width Textarea - No Send Button on Side */}
           <form onSubmit={onSubmit}>
@@ -102,13 +60,7 @@ const InputBar: React.FC<InputBarProps> = ({
               ref={textareaRef}
               value={currentMessage}
               onChange={(e) => setCurrentMessage(e.target.value)}
-              placeholder={
-                centered 
-                  ? "Ask anything..." 
-                  : uploadedDocuments.length > 0 
-                    ? "Ask questions about your documents..." 
-                    : "Ask anything or @mention a Space"
-              }
+              placeholder={centered ? "Ask anything..." : "Ask anything..."}
               minRows={1}
               maxRows={centered ? 8 : 5}
               className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:border-transparent shadow-sm`}
@@ -124,17 +76,12 @@ const InputBar: React.FC<InputBarProps> = ({
             />
           </form>
 
-          {/* 🔧 NEW: Bottom Button Bar (Like Perplexity) */}
+          {/* Bottom Button Bar (Like Perplexity) */}
           <div className="absolute bottom-3 right-4 flex items-center space-x-3">
-            {/* Attachment Button */}
+            {/* Attachment Button - Ready for future functionality */}
             <button
               type="button"
-              onClick={handleAttachmentClick}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-                showFileUpload 
-                  ? 'bg-[#5E507F] text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
               title="Upload document"
             >
               <Paperclip className="w-4 h-4" />
@@ -161,13 +108,6 @@ const InputBar: React.FC<InputBarProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Upload Status Indicator */}
-        {uploadedDocuments.length > 0 && (
-          <div className="mt-2 text-xs text-gray-500 text-center">
-            💡 You can now ask questions about your uploaded documents
-          </div>
-        )}
       </div>
     </div>
   );
