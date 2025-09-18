@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Optional, Dict, Any
 from enum import Enum
+from datetime import datetime
+
 
 class QueryType(str, Enum):
     FACTUAL = "factual"
@@ -58,3 +60,33 @@ class SearchResponse(BaseModel):
     synthesized_response: Optional[SynthesizedResponse] = None
     status: str = "analyzed"
     timestamp: str
+
+class DocumentUploadRequest(BaseModel):
+    session_id: Optional[str] = None
+
+class DocumentUploadResponse(BaseModel):
+    document_id: str
+    filename: str
+    status: str  # "completed" or "failed"
+    message: str
+    total_chunks: Optional[int] = None
+    processing_time: Optional[float] = None
+
+class SessionDocument(BaseModel):
+    document_id: str
+    filename: str
+    upload_time: str
+    total_chunks: int
+    file_size: int
+
+class DocumentSearchRequest(BaseModel):
+    query: str
+    session_id: str
+    max_results: int = 5
+
+class DocumentSearchResult(BaseModel):
+    content: str
+    page_number: int
+    similarity_score: float
+    document_filename: str
+    document_id: str

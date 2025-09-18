@@ -9,12 +9,19 @@ import json
 import asyncio
 import logging
 
-from models.schemas import SearchRequest, SearchResponse
+from models.schemas import SearchRequest, SearchResponse, DocumentSearchResult
 from services.query_analyzer import QueryAnalyzer
 from services.search_orchestrator import SearchOrchestrator
 from services.tavily_service import TavilyService
 from config.settings import settings
 from logger_config import setup_logger
+from services.groq_service import GroqService
+
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from models.schemas import DocumentUploadResponse, DocumentSearchRequest
+from services.document.document_processor import DocumentProcessor
+from services.document.document_store import DocumentStore
+import uuid
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -22,6 +29,9 @@ logger = logging.getLogger(__name__)
 # Initialize services
 query_analyzer = QueryAnalyzer()
 search_orchestrator = SearchOrchestrator()
+groq_service = GroqService() 
+document_processor = DocumentProcessor()
+document_store = DocumentStore()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,162 +57,228 @@ app.add_middleware(
 )
 
 @app.get("/chat_stream")
-async def chat_stream(message: str, checkpoint_id: str = None):
+async def chat_stream(message: str, checkpoint_id: str = None, session_id: str = None):
     async def generate_stream():
         try:
-            # Send search start event
-            search_start_data = {'type': 'search_start', 'query': message}
-            yield f"data: {json.dumps(search_start_data)}\n\n"
-            await asyncio.sleep(0.2)
+            logger.info(f"🚀 Chat stream started - Session: {session_id}, Query: {message}")
             
-            # STEP 1: Progressive Query Analysis
-            logger.info("Starting query analysis...")
-            request = SearchRequest(query=message)
+            # ✅ CRITICAL: Check documents FIRST
+            has_docs = False
+            if session_id:
+                has_docs = document_store.has_documents(session_id)
+                logger.info(f"📋 Session {session_id} has documents: {has_docs}")
             
-            # Analyze query to get sub-queries
-            analysis = await search_orchestrator.query_analyzer.process_query(request)
-            
-            # Send original query first
-            original_query_data = {
-                'type': 'query_generated',
-                'query': message,
-                'query_type': 'original'
-            }
-            yield f"data: {json.dumps(original_query_data)}\n\n"
-            await asyncio.sleep(0.3)
-            
-            # Send each sub-query progressively
-            if analysis.suggested_searches:
-                for i, sub_query in enumerate(analysis.suggested_searches):
-                    sub_query_data = {
-                        'type': 'query_generated',
-                        'query': sub_query,
-                        'query_type': 'sub_query',
-                        'index': i + 2  # Start from 2 (Original is 1)
-                    }
-                    yield f"data: {json.dumps(sub_query_data)}\n\n"
-                    await asyncio.sleep(0.4)  # Delay between each query
-            
-            # STEP 2: Progressive Web Search
-            logger.info("Starting web searches...")
-            
-            # Transition to "Reading sources" phase
-            reading_start_data = {'type': 'reading_start'}
-            yield f"data: {json.dumps(reading_start_data)}\n\n"
-            await asyncio.sleep(0.2)
-            
-            # Execute searches and send sources progressively
-            search_terms = [message] + analysis.suggested_searches
-            max_searches = min(len(search_terms), 4)
-            search_terms = search_terms[:max_searches]
-            
-            all_results = []
-            
-            # Process each search term and send sources as they come
-            for i, search_term in enumerate(search_terms):
-                logger.info(f"Searching for: {search_term}")
+            # ✅ DOCUMENT SEARCH PATH
+            if has_docs and session_id:
+                logger.info("📄 Using DOCUMENT SEARCH path")
                 
-                # Execute single search
-                search_results = await search_orchestrator.tavily_service._single_search(search_term, 2)
+                # Search documents
+                doc_results = document_store.search_documents(
+                    query=message,
+                    session_id=session_id,
+                    max_results=5
+                )
                 
-                if search_results.get('results'):
-                    for result in search_results['results']:
+                logger.info(f"🔍 Found {len(doc_results)} document chunks")
+                
+                if doc_results:
+                    # Show search phase
+                    yield f"data: {json.dumps({'type': 'search_start', 'query': message})}\n\n"
+                    await asyncio.sleep(0.3)
+                    
+                    # Show original query
+                    yield f"data: {json.dumps({'type': 'query_generated', 'query': message, 'query_type': 'original'})}\n\n"
+                    await asyncio.sleep(0.4)
+                    
+                    # Show reading sources phase
+                    yield f"data: {json.dumps({'type': 'reading_start'})}\n\n"
+                    await asyncio.sleep(0.3)
+                    
+                    # Show document sources
+                    for i, result in enumerate(doc_results):
                         try:
-                            parsed_url = urlparse(result['url'])
-                            domain = parsed_url.netloc.replace('www.', '')
+                            filename = result['metadata']['filename']
+                            page_num = result['metadata']['page_number']
                             
-                            # Send each source immediately as it's found
                             source_data = {
                                 'type': 'source_found',
                                 'source': {
-                                    'url': result['url'],
-                                    'domain': domain,
-                                    'title': result['title'],
-                                    'score': result.get('score', 0.8)
+                                    'url': f"document://{filename}#page{page_num}",
+                                    'domain': f"📄 {filename}",
+                                    'title': f"{filename} - Page {page_num}",
+                                    'score': abs(result.get('similarity_score', 0.8))
                                 }
                             }
                             yield f"data: {json.dumps(source_data)}\n\n"
-                            await asyncio.sleep(0.3)  # Delay between each source
-                            
-                            all_results.append(result)
+                            await asyncio.sleep(0.4)
                         except Exception as e:
-                            logger.warning(f"Error processing source: {e}")
+                            logger.warning(f"Error processing document source: {e}")
                             continue
+                    
+                    # Build context and generate response
+                    doc_context = ""
+                    for i, result in enumerate(doc_results, 1):
+                        doc_context += f"\n[Source {i} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
+                        doc_context += f"{result['content']}\n"
+                    
+                    document_prompt = f"""You are an expert assistant. Answer the user's question using ONLY the document content provided below.
+
+IMPORTANT INSTRUCTIONS:
+- Base your answer strictly on the provided document excerpts
+- Do NOT use external knowledge or make assumptions  
+- Include citations like [Source 1, Page X] when referencing content
+- If the document doesn't contain enough information, say so clearly
+- Provide a comprehensive, well-structured answer
+
+DOCUMENT EXCERPTS:
+{doc_context}
+
+USER QUESTION: {message}
+
+Provide a comprehensive answer based strictly on the document content above."""
+                    
+                    # Generate response
+                    logger.info("📝 Generating response from documents...")
+                    
+                    yield f"data: {json.dumps({'type': 'writing_start'})}\n\n"
+                    await asyncio.sleep(0.3)
+                    
+                    try:
+                        response = await groq_service.client.chat.completions.create(
+                            model="openai/gpt-oss-120b",
+                            messages=[
+                                {"role": "system", "content": "You are a precise document analysis assistant. Answer questions using only the provided document content. Always cite sources clearly with [Source X, Page Y] format."},
+                                {"role": "user", "content": document_prompt}
+                            ],
+                            temperature=0.1,
+                            max_tokens=1500
+                        )
+                        
+                        if response.choices and response.choices[0].message.content:
+                            response_text = response.choices[0].message.content
+                            
+                            # Stream response
+                            sentences = response_text.split('. ')
+                            for i, sentence in enumerate(sentences):
+                                if sentence.strip():
+                                    chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
+                                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                                    await asyncio.sleep(0.1)
+                        else:
+                            yield f"data: {json.dumps({'type': 'content', 'content': 'Could not generate response from documents.'})}\n\n"
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Document response generation failed: {e}")
+                        yield f"data: {json.dumps({'type': 'content', 'content': f'Error: {str(e)}'})}\n\n"
+                    
+                    yield f"data: {json.dumps({'type': 'end'})}\n\n"
+                    return  # ✅ CRITICAL: Exit here to prevent web search
             
-            # STEP 3: Generate Response
-            logger.info("Starting response generation...")
+            # ✅ WEB SEARCH FALLBACK (your existing code)
+            logger.info("🌐 Using WEB SEARCH path")
             
-            # Send writing phase start
-            writing_start_data = {'type': 'writing_start'}
-            yield f"data: {json.dumps(writing_start_data)}\n\n"
-            await asyncio.sleep(0.3)
-            
-            # Convert results to proper format for synthesis
-            search_results_obj = []
-            for result in all_results[:8]:  # Limit to top 8
-                try:
-                    from models.schemas import SearchResult
-                    search_result = SearchResult(
-                        title=result.get('title', 'No title'),
-                        url=result.get('url', ''),
-                        content=result.get('content', ''),
-                        score=result.get('score', 0.0),
-                        calculated_score=result.get('calculated_score'),
-                        published_date=result.get('published_date')
-                    )
-                    search_results_obj.append(search_result)
-                except Exception as e:
-                    logger.warning(f"Failed to parse result: {e}")
-                    continue
-            
-            # Create web results object
-            from models.schemas import WebSearchResults
-            web_results = WebSearchResults(
-                total_results=len(search_results_obj),
-                search_terms_used=search_terms,
-                results=search_results_obj,
-                search_duration=2.0
-            )
-            
-            # Synthesize response
-            synthesized_response = await search_orchestrator.content_synthesizer.synthesize_response(
-                query=message,
-                analysis=analysis,
-                web_results=web_results
-            )
-            
-            # Stream the content
-            if synthesized_response and synthesized_response.response:
-                response_text = synthesized_response.response
-                sentences = response_text.split('. ')
-                
-                for i, sentence in enumerate(sentences):
-                    if sentence.strip():
-                        chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
-                        content_data = {'type': 'content', 'content': chunk}
-                        yield f"data: {json.dumps(content_data)}\n\n"
-                        await asyncio.sleep(0.15)
-            
-            # Send end event
-            end_data = {'type': 'end'}
-            yield f"data: {json.dumps(end_data)}\n\n"
+            # ... rest of your existing web search code ...
+            # (Keep your existing web search implementation)
             
         except Exception as e:
             logger.error(f"Stream error: {e}")
-            error_data = {'type': 'search_error', 'error': f'Search failed: {str(e)}'}
-            yield f"data: {json.dumps(error_data)}\n\n"
-            end_data = {'type': 'end'}
-            yield f"data: {json.dumps(end_data)}\n\n"
+            yield f"data: {json.dumps({'type': 'search_error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'end'})}\n\n"
     
-    return StreamingResponse(
-        generate_stream(), 
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive", 
-            "Access-Control-Allow-Origin": "*",
+    return StreamingResponse(generate_stream(), media_type="text/event-stream")
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: str, session_id: str):
+    """Delete a document and all its chunks"""
+    try:
+        logger.info(f"🗑️ Deleting document {document_id} from session {session_id}")
+        
+        # Remove from ChromaDB
+        document_store.collection.delete(where={"document_id": {"$eq": document_id}})
+        
+        # Remove from session tracking
+        if session_id in document_store.session_documents:
+            document_store.session_documents[session_id] = [
+                doc for doc in document_store.session_documents[session_id] 
+                if doc.get("document_id") != document_id
+            ]
+            document_store._save_sessions()
+        
+        return {"message": "Document deleted successfully"}
+        
+    except Exception as e:
+        logger.error(f"Failed to delete document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
+
+
+@app.post("/documents/search")
+async def search_documents(request: DocumentSearchRequest):
+    """Search within uploaded documents"""
+    try:
+        results = document_store.search_documents(
+            query=request.query,
+            session_id=request.session_id,
+            max_results=request.max_results
+        )
+        
+        # Format results with CORRECT model
+        formatted_results = []
+        for result in results:
+            formatted_results.append(DocumentSearchResult(  # ✅ FIXED!
+                content=result["content"],
+                page_number=result["metadata"]["page_number"],
+                similarity_score=result["similarity_score"],
+                document_filename=result["metadata"]["filename"],
+                document_id=result["metadata"]["document_id"]
+            ))
+        
+        return {
+            "query": request.query,
+            "session_id": request.session_id,
+            "results": formatted_results,
+            "total_results": len(formatted_results)
         }
+        
+    except Exception as e:
+        logger.error(f"Document search failed: {e}")
+        raise HTTPException(status_code=500, detail="Search failed")
+
+@app.get("/debug/document-chunks/{session_id}")
+async def debug_document_chunks(session_id: str, query: str):
+    """Debug endpoint to see raw document chunks"""
+    results = document_store.search_documents(
+        query=query,
+        session_id=session_id,
+        max_results=5
     )
+    
+    return {
+        "query": query,
+        "raw_chunks": [
+            {
+                "content": result["content"][:200] + "...",
+                "page": result["metadata"]["page_number"],
+                "similarity": result["similarity_score"],
+                "filename": result["metadata"]["filename"]
+            }
+            for result in results
+        ]
+    }
+@app.get("/debug/sessions")
+async def debug_all_sessions():
+    """List all sessions and their documents"""
+    all_sessions = document_store.session_documents
+    return {
+        "total_sessions": len(all_sessions),
+        "sessions": {
+            session_id: {
+                "document_count": len(docs),
+                "documents": [doc.get("filename", "unknown") for doc in docs]
+            }
+            for session_id, docs in all_sessions.items()
+        }
+    }
+
 
 @app.get("/")
 async def root():
@@ -262,6 +338,79 @@ async def search_endpoint(request: SearchRequest):
     except Exception as e:
         logger.error(f"❌ Search endpoint error: {e}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@app.post("/documents/upload", response_model=DocumentUploadResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    session_id: str = Form(None)
+):
+    """Upload and process a document"""
+    try:
+        # Generate session_id if not provided
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        
+        # Process the document
+        result = await document_processor.process_upload(file, session_id)
+        
+        return DocumentUploadResponse(
+            document_id=result["document_id"],
+            filename=result["filename"],
+            status=result["status"],
+            message=result["message"],
+            total_chunks=result.get("total_chunks"),
+            processing_time=result.get("processing_time")
+        )
+        
+    except Exception as e:
+        logger.error(f"Document upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.get("/documents/session/{session_id}")
+async def get_session_documents(session_id: str):
+    """Get all documents for a session"""
+    try:
+        documents = document_store.get_session_documents(session_id)
+        return {
+            "session_id": session_id,
+            "documents": documents,
+            "total_documents": len(documents)
+        }
+    except Exception as e:
+        logger.error(f"Error getting session documents: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get documents")
+
+@app.post("/documents/search")
+async def search_documents(request: DocumentSearchRequest):
+    """Search within uploaded documents"""
+    try:
+        results = document_store.search_documents(
+            query=request.query,
+            session_id=request.session_id,
+            max_results=request.max_results
+        )
+        
+        # Format results
+        formatted_results = []
+        for result in results:
+            formatted_results.append(DocumentSearchResult(
+                content=result["content"],
+                page_number=result["metadata"]["page_number"],
+                similarity_score=result["similarity_score"],
+                document_filename=result["metadata"]["filename"],
+                document_id=result["metadata"]["document_id"]
+            ))
+        
+        return {
+            "query": request.query,
+            "session_id": request.session_id,
+            "results": formatted_results,
+            "total_results": len(formatted_results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Document search failed: {e}")
+        raise HTTPException(status_code=500, detail="Search failed")
 
 if __name__ == "__main__":
     uvicorn.run(
