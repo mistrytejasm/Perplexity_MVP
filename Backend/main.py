@@ -96,17 +96,23 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
             yield f"data: {json.dumps({'type': 'search_start', 'query': message, 'source': search_source})}\n\n"
             await asyncio.sleep(0.3)
             
-            # Show original query
+            # 🔥 FIXED: Show original query first
             yield f"data: {json.dumps({'type': 'query_generated', 'query': message, 'query_type': 'original'})}\n\n"
             await asyncio.sleep(0.4)
             
-            # 🔥 FIX: Show sub-queries for ALL modes (not just web)
-            if analysis.suggested_searches and len(analysis.suggested_searches) > 1:
-                for i, sub_query in enumerate(analysis.suggested_searches[:3]):
-                    if sub_query.lower() != message.lower():  # Don't repeat the main query
-                        yield f"data: {json.dumps({'type': 'subquery_generated', 'query': sub_query})}\n\n"
-                        await asyncio.sleep(0.2)
-            
+            # 🔥 ENHANCED: Show ALL sub-queries without limit
+            # Send each sub-query progressively
+            if analysis.suggested_searches:
+                for i, sub_query in enumerate(analysis.suggested_searches):
+                    sub_query_data = {
+                        'type': 'query_generated',
+                        'query': sub_query,
+                        'query_type': 'sub_query',
+                        'index': i + 2  # Start from 2 (Original is 1)
+                    }
+                    yield f"data: {json.dumps(sub_query_data)}\n\n"
+                    await asyncio.sleep(0.4)  # Delay between each query
+
             # Show reading phase
             yield f"data: {json.dumps({'type': 'reading_start'})}\n\n"
             await asyncio.sleep(0.3)
