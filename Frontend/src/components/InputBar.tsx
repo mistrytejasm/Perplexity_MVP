@@ -20,17 +20,30 @@ const InputBar: React.FC<InputBarProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); // 🔥 NEW: Only this added
-  const [uploadedDocs, setUploadedDocs] = useState<any[]>([]); // 🔥 NEW: Only this added
+  const [uploadedDocs, setUploadedDocs] = useState<{
+  id: string;
+  filename: string;
+  status: 'uploading' | 'processing' | 'ready' | 'error';
+  progress?: number;
+  error?: string;
+  }[]>([]);
 
-  // 🔥 NEW: Only this function added for file upload
-  const handleFileUpload = async (file: File) => {
+  // 🔥 UPDATED: Modified to accept uploadId parameter
+  const handleFileUploadWithId = async (file: File, uploadId: string) => {
     if (!file || !sessionId) return;
-    
+
+    console.log('Starting upload for:', file.name); // 🔥 DEBUG
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('session_id', sessionId);
 
     try {
+      // Update to processing status
+      setUploadedDocs(prev => prev.map(doc => 
+        doc.id === uploadId ? { ...doc, status: 'processing' } : doc
+      ));
+
       const response = await fetch('http://localhost:8000/documents/upload', {
         method: 'POST',
         body: formData,
@@ -38,12 +51,22 @@ const InputBar: React.FC<InputBarProps> = ({
 
       if (response.ok) {
         const result = await response.json();
-        setUploadedDocs(prev => [...prev, result]);
+        console.log('Upload successful:', result); // 🔥 DEBUG
+        setUploadedDocs(prev => prev.map(doc => 
+          doc.id === uploadId ? { ...doc, status: 'ready' } : doc
+        ));
+      } else {
+        throw new Error('Upload failed');
       }
     } catch (error) {
       console.error('Upload failed:', error);
+      setUploadedDocs(prev => prev.map(doc => 
+        doc.id === uploadId ? { ...doc, status: 'error' } : doc
+      ));
     }
   };
+
+
 
   // Auto-focus input when centered
   useEffect(() => {
@@ -79,25 +102,73 @@ const InputBar: React.FC<InputBarProps> = ({
     <div className={containerClasses}>
       <div className={innerContainerClasses}>
         {/* 🔥 NEW: Only this section added - show uploaded docs above input when not centered */}
-        {!centered && uploadedDocs.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {uploadedDocs.map((doc, idx) => (
-              <div key={idx} className="flex items-center bg-blue-100 text-blue-700 px-3 py-1 rounded-lg text-xs">
-                <FileText className="w-3 h-3 mr-1" />
-                <span className="truncate max-w-[120px]">{doc.filename}</span>
-                <button
-                  onClick={() => setUploadedDocs(prev => prev.filter((_, i) => i !== idx))}
-                  className="ml-2 hover:text-blue-900"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+        {/* 📄 Compact Document Chips */}
+        {uploadedDocs.length > 0 && (
+          <div className={`mb-3 ${centered ? 'mb-4' : ''}`}>
+            <div className="flex flex-wrap gap-2">
+              {uploadedDocs.map((doc) => (
+                <div key={doc.id} className="flex items-center bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 text-xs max-w-[200px]">
+                  {/* Document Icon - Smaller */}
+                  <FileText className="w-3 h-3 text-blue-600 mr-1.5 flex-shrink-0" />
+                  
+                  {/* Document Name - Truncated */}
+                  <span className="text-blue-800 truncate mr-2 font-medium">
+                    {doc.filename.length > 20 ? `${doc.filename.substring(0, 20)}...` : doc.filename}
+                  </span>
+                  
+                  {/* Status Indicator - Compact */}
+                  <div className="flex items-center mr-1.5">
+                    {/* Loading Animation */}
+                    {(doc.status === 'uploading' || doc.status === 'processing') && (
+                      <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    
+                    {/* Success Checkmark */}
+                    {doc.status === 'ready' && (
+                      <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                    
+                    {/* Error X */}
+                    {doc.status === 'error' && (
+                      <div className="w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                        <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Remove Button - Compact */}
+                  <button
+                    onClick={() => setUploadedDocs(prev => prev.filter(d => d.id !== doc.id))}
+                    className="text-blue-400 hover:text-blue-600 transition-colors flex-shrink-0"
+                    title="Remove document"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         {/* Perplexity-style Input Container - UNCHANGED */}
         <div className="relative">
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFileUpload(file);
+            }}
+            className="hidden"
+          />
           {/* Full Width Textarea - No Send Button on Side - UNCHANGED */}
           <form onSubmit={onSubmit}>
             <TextareaAutosize
@@ -125,12 +196,18 @@ const InputBar: React.FC<InputBarProps> = ({
             {/* Attachment Button - 🔥 NEW: Only added onClick functionality */}
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()} // 🔥 NEW: Only this line added
-              className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
+              onClick={() => fileInputRef.current?.click()}
+              className="relative w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
               title="Upload document"
             >
               <Paperclip className="w-4 h-4" />
+              {uploadedDocs.filter(doc => doc.status === 'ready').length > 0 && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                  {uploadedDocs.filter(doc => doc.status === 'ready').length}
+                </div>
+              )}
             </button>
+
 
             {/* Microphone Button - UNCHANGED */}
             <button
@@ -153,17 +230,35 @@ const InputBar: React.FC<InputBarProps> = ({
             </button>
           </div>
 
-          {/* 🔥 NEW: Only this hidden input added */}
+          {/* 🔥 UPDATED: Show file immediately when selected */}
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) handleFileUpload(file);
+              if (file) {
+                console.log('File selected:', file.name); // 🔥 DEBUG: Add this line
+                
+                // Show file immediately when selected
+                const uploadId = Date.now().toString();
+                setUploadedDocs(prev => [...prev, {
+                  id: uploadId,
+                  filename: file.name,
+                  status: 'uploading'
+                }]);
+                
+                // Then start the upload process
+                handleFileUploadWithId(file, uploadId);
+              }
+              
+              // Reset file input so same file can be selected again
+              e.target.value = '';
             }}
             className="hidden"
           />
+
+
         </div>
       </div>
     </div>

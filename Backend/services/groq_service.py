@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class GroqService:
     def __init__(self):
         self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
-        self.model = "openai/gpt-oss-120b"
+        self.model = "openai/gpt-oss-20b"
 
     async def analyze_query(self, query: str) -> QueryAnalysis:
         """Analyze user query to understand intent and generate search strategy"""

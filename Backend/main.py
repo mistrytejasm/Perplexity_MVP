@@ -64,7 +64,7 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
                 relevance_eval = document_store.evaluate_document_relevance(
                     query=message,
                     session_id=session_id,
-                    relevance_threshold=0.0  # Adjustable threshold
+                    relevance_threshold=0.10  # Adjustable threshold
                 )
                 
                 logger.info(f"🎯 Relevance evaluation: {relevance_eval['reason']} (score: {relevance_eval['relevance_score']:.3f})")
@@ -137,7 +137,7 @@ Provide a comprehensive answer based strictly on the document content above."""
                     
                     try:
                         response = await groq_service.client.chat.completions.create(
-                            model="openai/gpt-oss-120b",
+                            model="openai/gpt-oss-20b",
                             messages=[
                                 {"role": "system", "content": "You are a precise document analysis assistant. Answer questions using only the provided document content. Always cite sources clearly with [Source X, Page Y] format."},
                                 {"role": "user", "content": document_prompt}
