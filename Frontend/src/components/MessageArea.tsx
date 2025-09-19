@@ -31,11 +31,7 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                             <span className="font-medium mb-2 ml-2">
                                 {searchInfo.source === 'documents' ? 'Searching documents' : 
                                 searchInfo.source === 'web' ? 'Searching the web' : 'Searching the web'}
-                            </span><span className="font-medium mb-2 ml-2">
-                                {searchInfo.source === 'documents' ? 'Searching documents' : 
-                                searchInfo.source === 'web' ? 'Searching the web' : 'Searching the web'}
                             </span>
-
                             
                             {/* Show ALL Queries - Original + Sub-queries */}
                             <div className="flex flex-wrap gap-2 pl-2 mt-1">
