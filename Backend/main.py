@@ -58,24 +58,25 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
         try:
             logger.info(f"🚀 Chat stream started - Session: {session_id}, Query: {message}")
             
-            # 🔥 TEMPORARY: Always try document search first
+            # 🎯 PHASE 1: SMART DOCUMENT DETECTION
             if session_id:
-                logger.info("🔍 FORCE TESTING: Attempting document search...")
-                
-                # Search documents
-                doc_results = document_store.search_documents(
+                # Evaluate document relevance
+                relevance_eval = document_store.evaluate_document_relevance(
                     query=message,
                     session_id=session_id,
-                    max_results=5
+                    relevance_threshold=0.0  # Adjustable threshold
                 )
                 
-                logger.info(f"🔍 Found {len(doc_results)} document chunks for session {session_id}")
+                logger.info(f"🎯 Relevance evaluation: {relevance_eval['reason']} (score: {relevance_eval['relevance_score']:.3f})")
                 
-                if doc_results:
-                    logger.info("📄 Using DOCUMENT SEARCH path")
+                # 📄 DOCUMENT SEARCH PATH (when relevant)
+                if relevance_eval["should_use_documents"]:
+                    logger.info("📄 Using DOCUMENT SEARCH path (relevant documents found)")
                     
-                    # Show search phase  
-                    yield f"data: {json.dumps({'type': 'search_start', 'query': message})}\n\n"
+                    doc_results = relevance_eval["relevant_chunks"]
+                    
+                    # Show search phase - DOCUMENT MODE
+                    yield f"data: {json.dumps({'type': 'search_start', 'query': message, 'source': 'documents'})}\n\n"
                     await asyncio.sleep(0.3)
                     
                     # Show original query
@@ -163,13 +164,17 @@ Provide a comprehensive answer based strictly on the document content above."""
                         yield f"data: {json.dumps({'type': 'content', 'content': f'Error: {str(e)}'})}\n\n"
                     
                     yield f"data: {json.dumps({'type': 'end'})}\n\n"
-                    return  # ✅ Exit here to prevent web search
+                    return  # ✅ Exit here - documents provided sufficient answer
+                
+                else:
+                    # Documents exist but not relevant - log the reason
+                    logger.info(f"📄 Skipping documents: {relevance_eval['reason']} (score: {relevance_eval['relevance_score']:.3f})")
             
-            # Rest of your web search code stays the same...
+            # 🌐 WEB SEARCH PATH (no documents OR documents not relevant)
             logger.info("🌐 Using WEB SEARCH path")
-                        
-            # Show search start
-            yield f"data: {json.dumps({'type': 'search_start', 'query': message})}\n\n"
+            
+            # Show search start - WEB MODE
+            yield f"data: {json.dumps({'type': 'search_start', 'query': message, 'source': 'web'})}\n\n"
             await asyncio.sleep(0.3)
             
             # Analyze query
@@ -246,6 +251,7 @@ Provide a comprehensive answer based strictly on the document content above."""
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
     
     return StreamingResponse(generate_stream(), media_type="text/event-stream")
+
 
 @app.post("/documents/upload", response_model=DocumentUploadResponse)
 async def upload_document(

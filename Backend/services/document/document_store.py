@@ -35,12 +35,14 @@ class DocumentStore:
             if os.path.exists(self.session_file):
                 with open(self.session_file, 'rb') as f:
                     sessions = pickle.load(f)
-                logger.info(f"Loaded {len(sessions)} sessions from persistent storage")
+                logger.info(f"📂 Loaded {len(sessions)} sessions from persistent storage")
                 return sessions
         except Exception as e:
-            logger.warning(f"Could not load sessions: {e}")
+            logger.error(f"❌ Could not load sessions: {e}")
         
+        logger.info("📂 Starting with empty session storage")
         return {}
+
     
     def _save_sessions(self):
         """Save session documents to file"""
@@ -48,9 +50,11 @@ class DocumentStore:
             os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
             with open(self.session_file, 'wb') as f:
                 pickle.dump(self.session_documents, f)
-            logger.info("Sessions saved to persistent storage")
+            logger.info(f"💾 Sessions saved to persistent storage: {len(self.session_documents)} sessions")
+            logger.info(f"💾 Session IDs: {list(self.session_documents.keys())}")
         except Exception as e:
-            logger.error(f"Could not save sessions: {e}")
+            logger.error(f"❌ Could not save sessions: {e}")
+
     
     def store_document_chunks(self, chunks: List[Any], document_metadata: Dict[str, Any]) -> int:
         """Store document chunks with embeddings in ChromaDB"""
@@ -92,47 +96,85 @@ class DocumentStore:
         logger.info(f"Successfully stored {len(chunks)} chunks in ChromaDB")
         return len(chunks)
     
-    def search_documents(self, query: str, session_id: str, max_results: int = 5) -> List[Dict[str, Any]]:
-        """Search for similar document chunks"""
-        
+    def search_documents(self, query: str, session_id: str, max_results: int = 10) -> List[Dict[str, Any]]:
+        """Search for relevant documents in the session"""
         logger.info(f"Searching documents for session {session_id}: '{query[:50]}...'")
         
-        # Generate query embedding
-        query_embedding = self.embedding_model.encode([query]).tolist()
+        if session_id not in self.session_documents:
+            logger.warning(f"No documents found for session {session_id}")
+            return []
         
-        # Search ChromaDB
-        results = self.collection.query(
-            query_embeddings=query_embedding,
-            n_results=max_results,
-            where={"session_id": session_id} if session_id else None
-        )
-        
-        # Format results
-        search_results = []
-        for i in range(len(results['documents'][0])):
-            result = {
-                "content": results['documents'][0][i],
-                "metadata": results['metadatas'][0][i],
-                "similarity_score": 1 - results['distances'][0][i] if results['distances'][0] else 0.0,
-                "chunk_id": results['ids'][0][i]
-            }
-            search_results.append(result)
-        
-        logger.info(f"Found {len(search_results)} relevant chunks")
-        return search_results
+        try:
+            # 🔥 DEBUG: Test the embedding process
+            logger.info(f"🔍 DEBUG - Query: '{query}'")
+            
+            # Generate query embedding
+            query_embedding = self.embedding_model.encode([query])
+            logger.info(f"🔍 DEBUG - Query embedding shape: {query_embedding.shape}")
+            logger.info(f"🔍 DEBUG - Query embedding sample: {query_embedding[0][:5]}")  # First 5 values
+            
+            # Search ChromaDB
+            results = self.collection.query(
+                query_embeddings=query_embedding.tolist(),
+                n_results=max_results,
+                where={"session_id": session_id},
+                include=["documents", "metadatas", "distances"]
+            )
+            
+            logger.info(f"🔍 DEBUG - ChromaDB results count: {len(results['documents'][0])}")
+            logger.info(f"🔍 DEBUG - ChromaDB distances: {results['distances'][0][:3]}")  # First 3 distances
+            
+            if not results['documents'][0]:
+                logger.warning(f"No documents found in ChromaDB for session {session_id}")
+                return []
+            
+            # Convert to standardized format
+            doc_results = []
+            for i, (doc, metadata, distance) in enumerate(zip(
+                results['documents'][0],
+                results['metadatas'][0], 
+                results['distances'][0]
+            )):
+                # 🔥 DEBUG: Check individual results
+                similarity_score = 1 - distance  # Convert distance to similarity
+                logger.info(f"🔍 DEBUG - Result {i}: distance={distance:.3f}, similarity={similarity_score:.3f}")
+                logger.info(f"🔍 DEBUG - Content preview: '{doc[:100]}...'")
+                
+                doc_results.append({
+                    'content': doc,
+                    'metadata': metadata,
+                    'similarity_score': similarity_score,
+                    'distance': distance
+                })
+            
+            logger.info(f"Found {len(doc_results)} relevant chunks")
+            return doc_results
+            
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
+            return []
+
     
     def add_document_to_session(self, session_id: str, document_id: str, document_info: Dict[str, Any]):
         """Track document for a session - NOW PERSISTENT"""
         if session_id not in self.session_documents:
             self.session_documents[session_id] = []
+            logger.info(f"📝 Created new session: {session_id}")
         
         document_info["document_id"] = document_id
         self.session_documents[session_id].append(document_info)
         
-        # ✅ SAVE TO PERSISTENT STORAGE
+        # ✅ SAVE IMMEDIATELY AFTER ADDING
         self._save_sessions()
         
-        logger.info(f"Added document {document_id} to session {session_id} (persistent)")
+        logger.info(f"✅ Added document {document_id} to session {session_id}")
+        logger.info(f"📊 Session now has {len(self.session_documents[session_id])} documents")
+
+    def reload_sessions(self):
+        """Reload sessions from persistent storage"""
+        self.session_documents = self._load_sessions()
+        logger.info(f"🔄 Reloaded sessions: {list(self.session_documents.keys())}")
+
     
     def get_session_documents(self, session_id: str) -> List[Dict[str, Any]]:
         """Get all documents for a session"""
@@ -142,28 +184,104 @@ class DocumentStore:
         return documents
     
     def has_documents(self, session_id: str) -> bool:
-        """Check if session has any documents"""
-        # 🔥 FIX: Check both session tracking AND ChromaDB
-        
-        # First check session tracking
+        """Check if session has any documents - SESSION TRACKING ONLY"""
+        # 🔥 FIX: Only check session tracking (no ChromaDB queries)
         has_session_docs = session_id in self.session_documents and len(self.session_documents[session_id]) > 0
-        
-        # Also check ChromaDB directly as backup
-        try:
-            if not has_session_docs:
-                # Query ChromaDB for any chunks with this session_id
-                results = self.collection.query(
-                    query_texts=["test"],  # dummy query
-                    n_results=1,
-                    where={"session_id": session_id}
-                )
-                has_chroma_docs = len(results['documents'][0]) > 0 if results['documents'] else False
-                
-                logger.info(f"Session {session_id} - Session tracking: {has_session_docs}, ChromaDB: {has_chroma_docs}")
-                return has_chroma_docs
-                
-        except Exception as e:
-            logger.error(f"Error checking ChromaDB for session {session_id}: {e}")
         
         logger.info(f"Session {session_id} has documents: {has_session_docs}")
         return has_session_docs
+
+    
+    def evaluate_document_relevance(self, query: str, session_id: str, relevance_threshold: float = 0.5) -> Dict[str, Any]:
+        """
+        Evaluate if documents are relevant enough to answer the query
+        Returns relevance score and whether to use documents
+        """
+        logger.info(f"🎯 Evaluating document relevance for: '{query[:50]}...' (threshold: {relevance_threshold})")
+        
+        # 🔥 FIX: Reload sessions from disk before checking
+        self.reload_sessions()
+        
+        # 🔥 DEBUG: Add extensive logging
+        logger.info(f"🔍 DEBUG - Session ID: '{session_id}'")
+        logger.info(f"🔍 DEBUG - Available sessions: {list(self.session_documents.keys())}")
+        logger.info(f"🔍 DEBUG - Session exists in dict: {session_id in self.session_documents}")
+        
+        if session_id in self.session_documents:
+            logger.info(f"🔍 DEBUG - Documents in session: {len(self.session_documents[session_id])}")
+        
+        # Check session tracking directly
+        if not (session_id in self.session_documents and len(self.session_documents[session_id]) > 0):
+            logger.error(f"❌ No documents found in session tracking!")
+            return {
+                "should_use_documents": False,
+                "relevance_score": 0.0,
+                "reason": "No documents found",
+                "relevant_chunks": []
+            }
+        
+        logger.info("✅ Documents found in session! Proceeding with search...")
+        
+        # Rest of the method stays the same...
+        try:
+            doc_results = self.search_documents(query, session_id, max_results=5)
+            
+            if not doc_results:
+                return {
+                    "should_use_documents": False,
+                    "relevance_score": 0.0,
+                    "reason": "No relevant chunks found",
+                    "relevant_chunks": []
+                }
+            
+            # Calculate similarity scores
+            similarity_scores = [result.get("similarity_score", 0.0) for result in doc_results]
+            avg_similarity = sum(similarity_scores) / len(similarity_scores)
+            max_similarity = max(similarity_scores)
+            
+            # Decision logic
+            should_use_docs = max_similarity >= relevance_threshold
+            
+            reason = "relevant_documents" if should_use_docs else "low_relevance"
+            
+            logger.info(f"📊 Document relevance analysis:")
+            logger.info(f"   - Average similarity: {avg_similarity:.3f}")
+            logger.info(f"   - Max similarity: {max_similarity:.3f}")
+            logger.info(f"   - Threshold: {relevance_threshold}")
+            logger.info(f"   - Decision: {'USE DOCUMENTS' if should_use_docs else 'SKIP TO WEB'}")
+            
+            return {
+                "should_use_documents": should_use_docs,
+                "relevance_score": max_similarity,
+                "average_relevance": avg_similarity,
+                "reason": reason,
+                "relevant_chunks": doc_results if should_use_docs else []
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error in relevance evaluation: {e}")
+            return {
+                "should_use_documents": False,
+                "relevance_score": 0.0,
+                "reason": "evaluation_error",
+                "relevant_chunks": []
+            }
+        
+    # Add this to your document_store.py for testing
+    def test_search(self, session_id: str):
+        """Test document search manually"""
+        # Test with exact content from your document
+        test_queries = [
+            "Data Acquisition",
+            "Feature Engineering", 
+            "Natural Language Processing",
+            "Text Cleaning"
+        ]
+        
+        for query in test_queries:
+            results = self.search_documents(query, session_id, max_results=3)
+            print(f"\n🔍 Query: '{query}'")
+            for i, result in enumerate(results):
+                print(f"  Result {i}: similarity={result['similarity_score']:.3f}")
+                print(f"  Content: {result['content'][:100]}...")
+

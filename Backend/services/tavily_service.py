@@ -12,7 +12,7 @@ class TavilyService:
         self.base_url = "https://api.tavily.com"
         self.timeout = 30
 
-    async def search_multiple(self, search_terms: List[str], max_results_per_search: int =3) -> List[Dict[str, Any]]:
+    async def search_multiple(self, search_terms: List[str], max_results_per_search: int =1) -> List[Dict[str, Any]]:
         """Execute multiple searches in parallel"""
 
         logger.info(f"Executing {len(search_terms)} parallel searches")
