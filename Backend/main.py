@@ -58,136 +58,52 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
         try:
             logger.info(f"🚀 Chat stream started - Session: {session_id}, Query: {message}")
             
-            # 🎯 PHASE 1: SMART DOCUMENT DETECTION
+            # 🎯 PHASE 1: ANALYZE QUERY COMPLEXITY
+            analysis = await query_analyzer.process_query(SearchRequest(query=message))
+            is_multi_part_query = len(analysis.suggested_searches) > 1 or " and " in message.lower() or "?" in message[:-1]
+            
+            # 🎯 PHASE 2: DOCUMENT RELEVANCE CHECK
+            doc_results = []
+            has_relevant_docs = False
+            
             if session_id:
-                # Evaluate document relevance
                 relevance_eval = document_store.evaluate_document_relevance(
                     query=message,
                     session_id=session_id,
-                    relevance_threshold=0.10  # Adjustable threshold
+                    relevance_threshold=0.10
                 )
                 
                 logger.info(f"🎯 Relevance evaluation: {relevance_eval['reason']} (score: {relevance_eval['relevance_score']:.3f})")
                 
-                # 📄 DOCUMENT SEARCH PATH (when relevant)
                 if relevance_eval["should_use_documents"]:
-                    logger.info("📄 Using DOCUMENT SEARCH path (relevant documents found)")
-                    
+                    has_relevant_docs = True
                     doc_results = relevance_eval["relevant_chunks"]
-                    
-                    # Show search phase - DOCUMENT MODE
-                    yield f"data: {json.dumps({'type': 'search_start', 'query': message, 'source': 'documents'})}\n\n"
-                    await asyncio.sleep(0.3)
-                    
-                    # Show original query
-                    yield f"data: {json.dumps({'type': 'query_generated', 'query': message, 'query_type': 'original'})}\n\n"
-                    await asyncio.sleep(0.4)
-                    
-                    # Show reading sources phase
-                    yield f"data: {json.dumps({'type': 'reading_start'})}\n\n"
-                    await asyncio.sleep(0.3)
-                    
-                    # Show document sources
-                    for i, result in enumerate(doc_results):
-                        try:
-                            filename = result['metadata']['filename']
-                            page_num = result['metadata']['page_number']
-                            
-                            source_data = {
-                                'type': 'source_found',
-                                'source': {
-                                    'url': f"document://{filename}#page{page_num}",
-                                    'domain': f"📄 {filename}",
-                                    'title': f"{filename} - Page {page_num}",
-                                    'score': abs(result.get('similarity_score', 0.8))
-                                }
-                            }
-                            yield f"data: {json.dumps(source_data)}\n\n"
-                            await asyncio.sleep(0.4)
-                        except Exception as e:
-                            logger.warning(f"Error processing document source: {e}")
-                            continue
-                    
-                    # Build context and generate response
-                    doc_context = ""
-                    for i, result in enumerate(doc_results, 1):
-                        doc_context += f"\n[Source {i} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
-                        doc_context += f"{result['content']}\n"
-                    
-                    document_prompt = f"""You are an expert assistant. Answer the user's question using ONLY the document content provided below.
-IMPORTANT INSTRUCTIONS:
-- Base your answer strictly on the provided document excerpts
-- Do NOT use external knowledge or make assumptions  
-- Include citations like [Source 1, Page X] when referencing content
-- If the document doesn't contain enough information, say so clearly
-- Provide a comprehensive, well-structured answer
-
-DOCUMENT EXCERPTS:
-{doc_context}
-
-USER QUESTION: {message}
-
-Provide a comprehensive answer based strictly on the document content above."""
-                    
-                    # Generate response
-                    logger.info("📝 Generating response from documents...")
-                    
-                    yield f"data: {json.dumps({'type': 'writing_start'})}\n\n"
-                    await asyncio.sleep(0.3)
-                    
-                    try:
-                        response = await groq_service.client.chat.completions.create(
-                            model="openai/gpt-oss-20b",
-                            messages=[
-                                {"role": "system", "content": "You are a precise document analysis assistant. Answer questions using only the provided document content. Always cite sources clearly with [Source X, Page Y] format."},
-                                {"role": "user", "content": document_prompt}
-                            ],
-                            temperature=0.1,
-                            max_tokens=1500
-                        )
-                        
-                        if response.choices and response.choices[0].message.content:
-                            response_text = response.choices[0].message.content
-                            
-                            # Stream response
-                            sentences = response_text.split('. ')
-                            for i, sentence in enumerate(sentences):
-                                if sentence.strip():
-                                    chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
-                                    yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
-                                    await asyncio.sleep(0.1)
-                        else:
-                            yield f"data: {json.dumps({'type': 'content', 'content': 'Could not generate response from documents.'})}\n\n"
-                            
-                    except Exception as e:
-                        logger.error(f"❌ Document response generation failed: {e}")
-                        yield f"data: {json.dumps({'type': 'content', 'content': f'Error: {str(e)}'})}\n\n"
-                    
-                    yield f"data: {json.dumps({'type': 'end'})}\n\n"
-                    return  # ✅ Exit here - documents provided sufficient answer
-                
-                else:
-                    # Documents exist but not relevant - log the reason
-                    logger.info(f"📄 Skipping documents: {relevance_eval['reason']} (score: {relevance_eval['relevance_score']:.3f})")
             
-            # 🌐 WEB SEARCH PATH (no documents OR documents not relevant)
-            logger.info("🌐 Using WEB SEARCH path")
+            # 🎯 PHASE 3: HYBRID DECISION LOGIC
+            use_hybrid = is_multi_part_query and has_relevant_docs  # Fixed logic
             
-            # Show search start - WEB MODE
-            yield f"data: {json.dumps({'type': 'search_start', 'query': message, 'source': 'web'})}\n\n"
+            if use_hybrid:
+                logger.info("🔄 Using HYBRID SEARCH path (documents + web)")
+                search_source = 'hybrid'
+            elif has_relevant_docs:
+                logger.info("📄 Using DOCUMENT SEARCH path")
+                search_source = 'documents'
+            else:
+                logger.info("🌐 Using WEB SEARCH path")
+                search_source = 'web'
+            
+            # 🎯 PHASE 4: SEARCH EXECUTION
+            yield f"data: {json.dumps({'type': 'search_start', 'query': message, 'source': search_source})}\n\n"
             await asyncio.sleep(0.3)
             
-            # Analyze query
-            analysis = await query_analyzer.process_query(SearchRequest(query=message))
-            
-            # Show query analysis
+            # Show original query
             yield f"data: {json.dumps({'type': 'query_generated', 'query': message, 'query_type': 'original'})}\n\n"
             await asyncio.sleep(0.4)
             
-            # Show sub-queries if any
-            if analysis.suggested_searches:
+            # 🔥 FIX: Show sub-queries for ALL modes (not just web)
+            if analysis.suggested_searches and len(analysis.suggested_searches) > 1:
                 for i, sub_query in enumerate(analysis.suggested_searches[:3]):
-                    if sub_query != message:
+                    if sub_query.lower() != message.lower():  # Don't repeat the main query
                         yield f"data: {json.dumps({'type': 'subquery_generated', 'query': sub_query})}\n\n"
                         await asyncio.sleep(0.2)
             
@@ -195,52 +111,159 @@ Provide a comprehensive answer based strictly on the document content above."""
             yield f"data: {json.dumps({'type': 'reading_start'})}\n\n"
             await asyncio.sleep(0.3)
             
-            # Execute web search
-            web_results = await search_orchestrator._execute_web_search(analysis, message)
+            # 🔥 HYBRID SOURCES: Show both document and web sources
+            web_results = None
             
-            # Show sources
-            for i, result in enumerate(web_results.results[:6]):
-                try:
-                    domain = result.url.split('/')[2].replace('www.', '') if result.url else 'unknown'
-                    source_data = {
-                        'type': 'source_found',
-                        'source': {
-                            'url': result.url,
-                            'domain': domain,
-                            'title': result.title,
-                            'score': result.score
+            # Show document sources (if any)
+            if doc_results:
+                for i, result in enumerate(doc_results):
+                    try:
+                        filename = result['metadata']['filename']
+                        page_num = result['metadata']['page_number']
+                        
+                        source_data = {
+                            'type': 'source_found',
+                            'source': {
+                                'url': f"document://{filename}#page{page_num}",
+                                'domain': f"📄 {filename}",
+                                'title': f"{filename} - Page {page_num}",
+                                'score': abs(result.get('similarity_score', 0.8))
+                            }
                         }
-                    }
-                    yield f"data: {json.dumps(source_data)}\n\n"
-                    await asyncio.sleep(0.3)
-                except Exception as e:
-                    logger.warning(f"Error processing web source: {e}")
-                    continue
+                        yield f"data: {json.dumps(source_data)}\n\n"
+                        await asyncio.sleep(0.3)
+                    except Exception as e:
+                        logger.warning(f"Error processing document source: {e}")
+                        continue
             
-            # Generate synthesized response
+            # Get web results (always, for hybrid or web-only)
+            if search_source == 'web' or search_source == 'hybrid':
+                web_results = await search_orchestrator._execute_web_search(analysis, message)
+                
+                # Show web sources
+                for i, result in enumerate(web_results.results[:6]):
+                    try:
+                        domain = result.url.split('/')[2].replace('www.', '') if result.url else 'unknown'
+                        source_data = {
+                            'type': 'source_found',
+                            'source': {
+                                'url': result.url,
+                                'domain': domain,
+                                'title': result.title,
+                                'score': result.score
+                            }
+                        }
+                        yield f"data: {json.dumps(source_data)}\n\n"
+                        await asyncio.sleep(0.3)
+                    except Exception as e:
+                        logger.warning(f"Error processing web source: {e}")
+                        continue
+            
+            # 🎯 PHASE 5: RESPONSE GENERATION
             yield f"data: {json.dumps({'type': 'writing_start'})}\n\n"
             await asyncio.sleep(0.3)
             
             try:
-                from services.content_synthesizer import ContentSynthesizer
-                synthesizer = ContentSynthesizer()
+                if search_source == 'documents':
+                    # 🔥 FIXED: Generate document response inline
+                    doc_context = ""
+                    for i, result in enumerate(doc_results, 1):
+                        doc_context += f"\n[Source {i} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
+                        doc_context += f"{result['content']}\n"
+                    
+                    document_prompt = f"""Answer the user's question using ONLY the provided document content.
+DOCUMENT EXCERPTS:
+{doc_context}
+
+USER QUESTION: {message}
+
+Provide a comprehensive answer with citations [Source X, Page Y]."""
+                    
+                    response = await groq_service.client.chat.completions.create(
+                        model="openai/gpt-oss-20b",
+                        messages=[
+                            {"role": "system", "content": "You are a precise document analysis assistant. Always cite sources."},
+                            {"role": "user", "content": document_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=1500
+                    )
+                    
+                    if response.choices and response.choices[0].message.content:
+                        response_text = response.choices[0].message.content
+                        sentences = response_text.split('. ')
+                        for i, sentence in enumerate(sentences):
+                            if sentence.strip():
+                                chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
+                                yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                                await asyncio.sleep(0.1)
                 
-                synthesized = await synthesizer.synthesize_response(
-                    query=message,
-                    analysis=analysis,
-                    web_results=web_results
-                )
+                elif search_source == 'web':
+                    # 🔥 FIXED: Generate web response inline
+                    from services.content_synthesizer import ContentSynthesizer
+                    synthesizer = ContentSynthesizer()
+                    
+                    synthesized = await synthesizer.synthesize_response(
+                        query=message,
+                        analysis=analysis,
+                        web_results=web_results
+                    )
+                    
+                    sentences = synthesized.response.split('. ')
+                    for i, sentence in enumerate(sentences):
+                        if sentence.strip():
+                            chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
+                            yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                            await asyncio.sleep(0.1)
                 
-                # Stream the synthesized response
-                sentences = synthesized.response.split('. ')
-                for i, sentence in enumerate(sentences):
-                    if sentence.strip():
-                        chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
-                        yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
-                        await asyncio.sleep(0.1)
+                else:  # hybrid
+                    # 🔥 FIXED: Generate hybrid response inline
+                    doc_context = ""
+                    if doc_results:
+                        for i, result in enumerate(doc_results, 1):
+                            doc_context += f"\n[Document Source {i} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
+                            doc_context += f"{result['content']}\n"
+                    
+                    web_context = ""
+                    if web_results and web_results.results:
+                        for i, result in enumerate(web_results.results[:3], 1):
+                            web_context += f"\n[Web Source {i} - {result.url}]:\n"
+                            web_context += f"{result.content}\n"
+                    
+                    hybrid_prompt = f"""Answer the user's question using BOTH document excerpts AND web sources provided below.
+IMPORTANT: Combine information from both sources to give a comprehensive answer.
+
+DOCUMENT EXCERPTS:
+{doc_context}
+
+WEB SOURCES:
+{web_context}
+
+USER QUESTION: {message}
+
+Provide a comprehensive answer that integrates information from both documents and web sources. Use citations like [Document Source X] and [Web Source Y]."""
+                    
+                    response = await groq_service.client.chat.completions.create(
+                        model="openai/gpt-oss-20b",
+                        messages=[
+                            {"role": "system", "content": "You are an expert research assistant. Combine information from multiple sources effectively."},
+                            {"role": "user", "content": hybrid_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=2000
+                    )
+                    
+                    if response.choices and response.choices[0].message.content:
+                        response_text = response.choices[0].message.content
+                        sentences = response_text.split('. ')
+                        for i, sentence in enumerate(sentences):
+                            if sentence.strip():
+                                chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
+                                yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                                await asyncio.sleep(0.1)
                         
             except Exception as e:
-                logger.error(f"❌ Web response generation failed: {e}")
+                logger.error(f"❌ Response generation failed: {e}")
                 yield f"data: {json.dumps({'type': 'content', 'content': f'Error generating response: {str(e)}'})}\n\n"
             
             yield f"data: {json.dumps({'type': 'end'})}\n\n"

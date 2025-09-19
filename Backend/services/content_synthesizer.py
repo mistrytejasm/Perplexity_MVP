@@ -13,8 +13,8 @@ class ContentSynthesizer:
 
     def __init__(self):
         self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
-        self.model = "openai/gpt-oss-120b"
-        self.max_content_length = 4000   # Limit content per source
+        self.model = "openai/gpt-oss-20b"
+        self.max_content_length = 2000   # Limit content per source
 
     async def synthesize_response(self, 
                                   query: str, 
