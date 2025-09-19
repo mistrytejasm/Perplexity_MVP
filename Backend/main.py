@@ -1,27 +1,23 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from fastapi.responses import StreamingResponse
 from datetime import datetime
-from urllib.parse import urlparse
 import uvicorn
 import json
 import asyncio
 import logging
+import uuid
 
-from models.schemas import SearchRequest, SearchResponse, DocumentSearchResult
+from models.schemas import SearchRequest, SearchResponse, DocumentSearchResult, DocumentUploadResponse, DocumentSearchRequest
 from services.query_analyzer import QueryAnalyzer
 from services.search_orchestrator import SearchOrchestrator
 from services.tavily_service import TavilyService
 from config.settings import settings
 from logger_config import setup_logger
 from services.groq_service import GroqService
-
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
-from models.schemas import DocumentUploadResponse, DocumentSearchRequest
 from services.document.document_processor import DocumentProcessor
 from services.document.document_store import DocumentStore
-import uuid
 
 setup_logger()
 logger = logging.getLogger(__name__)
@@ -62,15 +58,9 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
         try:
             logger.info(f"🚀 Chat stream started - Session: {session_id}, Query: {message}")
             
-            # ✅ CRITICAL: Check documents FIRST
-            has_docs = False
+            # 🔥 TEMPORARY: Always try document search first
             if session_id:
-                has_docs = document_store.has_documents(session_id)
-                logger.info(f"📋 Session {session_id} has documents: {has_docs}")
-            
-            # ✅ DOCUMENT SEARCH PATH
-            if has_docs and session_id:
-                logger.info("📄 Using DOCUMENT SEARCH path")
+                logger.info("🔍 FORCE TESTING: Attempting document search...")
                 
                 # Search documents
                 doc_results = document_store.search_documents(
@@ -79,10 +69,12 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
                     max_results=5
                 )
                 
-                logger.info(f"🔍 Found {len(doc_results)} document chunks")
+                logger.info(f"🔍 Found {len(doc_results)} document chunks for session {session_id}")
                 
                 if doc_results:
-                    # Show search phase
+                    logger.info("📄 Using DOCUMENT SEARCH path")
+                    
+                    # Show search phase  
                     yield f"data: {json.dumps({'type': 'search_start', 'query': message})}\n\n"
                     await asyncio.sleep(0.3)
                     
@@ -122,7 +114,6 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
                         doc_context += f"{result['content']}\n"
                     
                     document_prompt = f"""You are an expert assistant. Answer the user's question using ONLY the document content provided below.
-
 IMPORTANT INSTRUCTIONS:
 - Base your answer strictly on the provided document excerpts
 - Do NOT use external knowledge or make assumptions  
@@ -172,13 +163,82 @@ Provide a comprehensive answer based strictly on the document content above."""
                         yield f"data: {json.dumps({'type': 'content', 'content': f'Error: {str(e)}'})}\n\n"
                     
                     yield f"data: {json.dumps({'type': 'end'})}\n\n"
-                    return  # ✅ CRITICAL: Exit here to prevent web search
+                    return  # ✅ Exit here to prevent web search
             
-            # ✅ WEB SEARCH FALLBACK (your existing code)
+            # Rest of your web search code stays the same...
             logger.info("🌐 Using WEB SEARCH path")
+                        
+            # Show search start
+            yield f"data: {json.dumps({'type': 'search_start', 'query': message})}\n\n"
+            await asyncio.sleep(0.3)
             
-            # ... rest of your existing web search code ...
-            # (Keep your existing web search implementation)
+            # Analyze query
+            analysis = await query_analyzer.process_query(SearchRequest(query=message))
+            
+            # Show query analysis
+            yield f"data: {json.dumps({'type': 'query_generated', 'query': message, 'query_type': 'original'})}\n\n"
+            await asyncio.sleep(0.4)
+            
+            # Show sub-queries if any
+            if analysis.suggested_searches:
+                for i, sub_query in enumerate(analysis.suggested_searches[:3]):
+                    if sub_query != message:
+                        yield f"data: {json.dumps({'type': 'subquery_generated', 'query': sub_query})}\n\n"
+                        await asyncio.sleep(0.2)
+            
+            # Show reading phase
+            yield f"data: {json.dumps({'type': 'reading_start'})}\n\n"
+            await asyncio.sleep(0.3)
+            
+            # Execute web search
+            web_results = await search_orchestrator._execute_web_search(analysis, message)
+            
+            # Show sources
+            for i, result in enumerate(web_results.results[:6]):
+                try:
+                    domain = result.url.split('/')[2].replace('www.', '') if result.url else 'unknown'
+                    source_data = {
+                        'type': 'source_found',
+                        'source': {
+                            'url': result.url,
+                            'domain': domain,
+                            'title': result.title,
+                            'score': result.score
+                        }
+                    }
+                    yield f"data: {json.dumps(source_data)}\n\n"
+                    await asyncio.sleep(0.3)
+                except Exception as e:
+                    logger.warning(f"Error processing web source: {e}")
+                    continue
+            
+            # Generate synthesized response
+            yield f"data: {json.dumps({'type': 'writing_start'})}\n\n"
+            await asyncio.sleep(0.3)
+            
+            try:
+                from services.content_synthesizer import ContentSynthesizer
+                synthesizer = ContentSynthesizer()
+                
+                synthesized = await synthesizer.synthesize_response(
+                    query=message,
+                    analysis=analysis,
+                    web_results=web_results
+                )
+                
+                # Stream the synthesized response
+                sentences = synthesized.response.split('. ')
+                for i, sentence in enumerate(sentences):
+                    if sentence.strip():
+                        chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
+                        yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
+                        await asyncio.sleep(0.1)
+                        
+            except Exception as e:
+                logger.error(f"❌ Web response generation failed: {e}")
+                yield f"data: {json.dumps({'type': 'content', 'content': f'Error generating response: {str(e)}'})}\n\n"
+            
+            yield f"data: {json.dumps({'type': 'end'})}\n\n"
             
         except Exception as e:
             logger.error(f"Stream error: {e}")
@@ -186,158 +246,6 @@ Provide a comprehensive answer based strictly on the document content above."""
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
     
     return StreamingResponse(generate_stream(), media_type="text/event-stream")
-
-@app.delete("/documents/{document_id}")
-async def delete_document(document_id: str, session_id: str):
-    """Delete a document and all its chunks"""
-    try:
-        logger.info(f"🗑️ Deleting document {document_id} from session {session_id}")
-        
-        # Remove from ChromaDB
-        document_store.collection.delete(where={"document_id": {"$eq": document_id}})
-        
-        # Remove from session tracking
-        if session_id in document_store.session_documents:
-            document_store.session_documents[session_id] = [
-                doc for doc in document_store.session_documents[session_id] 
-                if doc.get("document_id") != document_id
-            ]
-            document_store._save_sessions()
-        
-        return {"message": "Document deleted successfully"}
-        
-    except Exception as e:
-        logger.error(f"Failed to delete document {document_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
-
-
-@app.post("/documents/search")
-async def search_documents(request: DocumentSearchRequest):
-    """Search within uploaded documents"""
-    try:
-        results = document_store.search_documents(
-            query=request.query,
-            session_id=request.session_id,
-            max_results=request.max_results
-        )
-        
-        # Format results with CORRECT model
-        formatted_results = []
-        for result in results:
-            formatted_results.append(DocumentSearchResult(  # ✅ FIXED!
-                content=result["content"],
-                page_number=result["metadata"]["page_number"],
-                similarity_score=result["similarity_score"],
-                document_filename=result["metadata"]["filename"],
-                document_id=result["metadata"]["document_id"]
-            ))
-        
-        return {
-            "query": request.query,
-            "session_id": request.session_id,
-            "results": formatted_results,
-            "total_results": len(formatted_results)
-        }
-        
-    except Exception as e:
-        logger.error(f"Document search failed: {e}")
-        raise HTTPException(status_code=500, detail="Search failed")
-
-@app.get("/debug/document-chunks/{session_id}")
-async def debug_document_chunks(session_id: str, query: str):
-    """Debug endpoint to see raw document chunks"""
-    results = document_store.search_documents(
-        query=query,
-        session_id=session_id,
-        max_results=5
-    )
-    
-    return {
-        "query": query,
-        "raw_chunks": [
-            {
-                "content": result["content"][:200] + "...",
-                "page": result["metadata"]["page_number"],
-                "similarity": result["similarity_score"],
-                "filename": result["metadata"]["filename"]
-            }
-            for result in results
-        ]
-    }
-@app.get("/debug/sessions")
-async def debug_all_sessions():
-    """List all sessions and their documents"""
-    all_sessions = document_store.session_documents
-    return {
-        "total_sessions": len(all_sessions),
-        "sessions": {
-            session_id: {
-                "document_count": len(docs),
-                "documents": [doc.get("filename", "unknown") for doc in docs]
-            }
-            for session_id, docs in all_sessions.items()
-        }
-    }
-
-
-@app.get("/")
-async def root():
-    """Health check point"""
-    return {
-        "message": "Perplexity MVP API is Running. :)",
-        "status": "Healthy",
-        "timestamp": datetime.now().isoformat()
-    }
-
-@app.get("/health")
-async def health_check():
-    """Detailed health check"""
-    return {
-        "status": "healthy",
-        "services": {
-            "groq": "connected",  # Add actual health checks later
-            "tavily": "connected"
-        },
-        "timestamp": datetime.now().isoformat()
-    }
-
-# Add a test endpoint to verify Tavily connection
-@app.get("/test-tavily")
-async def test_tavily_endpoint():
-    """Test Tavily API connection"""
-    try:
-        tavily = TavilyService()
-        results = await tavily.search_multiple(["test query"], max_results_per_search=1)
-        return {
-            "status": "success",
-            "results_count": len(results),
-            "message": "Tavily API is working!"
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Tavily API error: {str(e)}"
-        }
-
-@app.post("/search", response_model=SearchResponse)
-async def search_endpoint(request: SearchRequest):
-    """Complete search endpoint - Steps 1 & 2: Query Analysis + Web Search"""
-    
-    try:
-        logger.info(f"Starting complete search for: {request.query}")
-        
-        # Execute complete search pipeline
-        response = await search_orchestrator.execute_search(request)
-        
-        # Log Summary
-        if response.web_results:
-            logger.info(f"Completed search for: {response.web_results.total_results}")
-        
-        return response
-        
-    except Exception as e:
-        logger.error(f"❌ Search endpoint error: {e}")
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.post("/documents/upload", response_model=DocumentUploadResponse)
 async def upload_document(
@@ -379,6 +287,24 @@ async def get_session_documents(session_id: str):
     except Exception as e:
         logger.error(f"Error getting session documents: {e}")
         raise HTTPException(status_code=500, detail="Failed to get documents")
+    
+@app.get("/debug/session/{session_id}")
+async def debug_session(session_id: str):
+    """Debug endpoint to check session documents"""
+    try:
+        has_docs = document_store.has_documents(session_id)
+        documents = document_store.get_session_documents(session_id)
+        
+        return {
+            "session_id": session_id,
+            "has_documents": has_docs,
+            "document_count": len(documents),
+            "documents": documents,
+            "all_sessions": list(document_store.session_documents.keys())
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @app.post("/documents/search")
 async def search_documents(request: DocumentSearchRequest):
@@ -411,6 +337,87 @@ async def search_documents(request: DocumentSearchRequest):
     except Exception as e:
         logger.error(f"Document search failed: {e}")
         raise HTTPException(status_code=500, detail="Search failed")
+
+@app.delete("/documents/{document_id}")
+async def delete_document(document_id: str, session_id: str):
+    """Delete a document and all its chunks"""
+    try:
+        logger.info(f"🗑️ Deleting document {document_id} from session {session_id}")
+        
+        # Remove from ChromaDB
+        document_store.collection.delete(where={"document_id": {"$eq": document_id}})
+        
+        # Remove from session tracking
+        if session_id in document_store.session_documents:
+            document_store.session_documents[session_id] = [
+                doc for doc in document_store.session_documents[session_id] 
+                if doc.get("document_id") != document_id
+            ]
+            document_store._save_sessions()
+        
+        return {"message": "Document deleted successfully"}
+        
+    except Exception as e:
+        logger.error(f"Failed to delete document {document_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}")
+
+@app.get("/")
+async def root():
+    """Health check point"""
+    return {
+        "message": "Perplexity MVP API is Running. :)",
+        "status": "Healthy",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/health")
+async def health_check():
+    """Detailed health check"""
+    return {
+        "status": "healthy",
+        "services": {
+            "groq": "connected",
+            "tavily": "connected"
+        },
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/test-tavily")
+async def test_tavily_endpoint():
+    """Test Tavily API connection"""
+    try:
+        tavily = TavilyService()
+        results = await tavily.search_multiple(["test query"], max_results_per_search=1)
+        return {
+            "status": "success",
+            "results_count": len(results),
+            "message": "Tavily API is working!"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Tavily API error: {str(e)}"
+        }
+
+@app.post("/search", response_model=SearchResponse)
+async def search_endpoint(request: SearchRequest):
+    """Complete search endpoint - Steps 1 & 2: Query Analysis + Web Search"""
+    
+    try:
+        logger.info(f"Starting complete search for: {request.query}")
+        
+        # Execute complete search pipeline
+        response = await search_orchestrator.execute_search(request)
+        
+        # Log Summary
+        if response.web_results:
+            logger.info(f"Completed search for: {response.web_results.total_results}")
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ Search endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

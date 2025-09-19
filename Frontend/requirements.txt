@@ -1,3 +1,16 @@
 # npm install @types/react-syntax-highlighter
 # npm install react-syntax-highlighter
 # npm install react-textarea-autosize
+
+
+# # Remove node_modules and lockfile
+# Remove-Item -Recurse -Force node_modules, package-lock.json
+
+# # Install fresh dependencies
+# npm install
+
+# # Install required packages
+# npm install tailwindcss postcss autoprefixer lucide-react
+
+# # Install development dependencies  
+# npm install -D @types/node

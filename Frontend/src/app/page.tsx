@@ -1,8 +1,10 @@
 "use client"
-
 import InputBar from '@/components/InputBar';
 import MessageArea from '@/components/MessageArea';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // 🔥 Add useEffect
+
+// 🔥 NEW: Simple session ID generator (add this one function)
+const generateSessionId = () => 'session_' + Date.now();
 
 interface SearchInfo {
   stages: string[];
@@ -29,10 +31,24 @@ const Home = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [checkpointId, setCheckpointId] = useState(null);
-  const [hasStartedChat, setHasStartedChat] = useState(false); // 🔧 NEW: Track if chat has started
+  const [hasStartedChat, setHasStartedChat] = useState(false);
+  const [sessionId, setSessionId] = useState(''); 
+
+  // 🔥 NEW: Initialize session (add this one useEffect)
+  useEffect(() => {
+  const existingSession = localStorage.getItem('perplexity_session_id');
+  if (existingSession) {
+    setSessionId(existingSession);
+  } else {
+    const newSession = generateSessionId();
+    setSessionId(newSession);
+    localStorage.setItem('perplexity_session_id', newSession);
+  }
+  }, []);
 
   // Helper function to merge search info incrementally
   const mergeSearchInfo = (existing: SearchInfo | undefined, newData: any): SearchInfo => {
+    // ... keep your existing mergeSearchInfo function exactly as is
     const merged: SearchInfo = {
       stages: [...(existing?.stages || [])],
       query: existing?.query || "",
@@ -131,15 +147,12 @@ const Home = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (currentMessage.trim()) {
-
-      // 🔧 NEW: Mark that chat has started
+      // 🔥 NEW: Mark that chat has started
       if (!hasStartedChat) {
         setHasStartedChat(true);
       }
-
       // First add the user message to the chat
       const newMessageId = messages.length > 0 ? Math.max(...messages.map(msg => msg.id)) + 1 : 1;
-
       setMessages(prev => [
         ...prev,
         {
@@ -177,16 +190,13 @@ const Home = () => {
           }
         ]);
 
-        // Create URL with checkpoint ID if it exists
-        let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}`;
+        // 🔥 UPDATED: Add session_id to URL (change this one line)
+        let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
         if (checkpointId) url += `&checkpoint_id=${encodeURIComponent(checkpointId)}`;
 
-        // Connect to SSE endpoint using EventSource
+        // ... keep the rest of your handleSubmit function exactly as is
         const eventSource = new EventSource(url);
         let streamedContent = "";
-
-        // Process incoming messages
-        // In your handleSubmit function, replace the eventSource.onmessage handler:
 
         eventSource.onmessage = (event) => {
           try {
@@ -196,7 +206,6 @@ const Home = () => {
               setCheckpointId(data.checkpoint_id);
             }
             else if (data.type === 'search_start') {
-              // Initialize search info
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
@@ -218,7 +227,6 @@ const Home = () => {
               );
             }
             else if (data.type === 'query_generated') {
-              // Add each query progressively
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
@@ -238,7 +246,6 @@ const Home = () => {
               );
             }
             else if (data.type === 'reading_start') {
-              // Transition to reading phase
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
@@ -254,7 +261,6 @@ const Home = () => {
               );
             }
             else if (data.type === 'source_found') {
-              // Add each source progressively
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
@@ -275,7 +281,6 @@ const Home = () => {
               );
             }
             else if (data.type === 'writing_start') {
-              // Transition to writing phase
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
@@ -319,7 +324,6 @@ const Home = () => {
         eventSource.onerror = (error) => {
           console.error("EventSource error:", error);
           eventSource.close();
-
           if (!streamedContent) {
             setMessages(prev =>
               prev.map(msg =>
@@ -366,7 +370,7 @@ const Home = () => {
     }
   };
 
-  // 🔧 NEW: Render different layouts based on chat state
+  // 🔥 NEW: Render different layouts based on chat state
   if (!hasStartedChat) {
     return (
       <div className="min-h-screen bg-[#FCFCF8] flex flex-col items-center justify-center px-6 -mt-16">
@@ -377,7 +381,6 @@ const Home = () => {
           </h1>
           <p className="text-sm text-gray-500">Where Knowledge Begins</p>
         </div>
-
         {/* Compact Input - Choose your preferred width */}
         <div className="w-full max-w-lg mx-8"> 
           <InputBar 
@@ -385,12 +388,12 @@ const Home = () => {
             setCurrentMessage={setCurrentMessage} 
             onSubmit={handleSubmit}
             centered={true}
+            sessionId={sessionId} // 🔥 NEW: Pass session ID
           />
         </div>
       </div>
     );
   }
-
 
   // Chat interface with input at bottom
   return (
@@ -406,12 +409,12 @@ const Home = () => {
           currentMessage={currentMessage} 
           setCurrentMessage={setCurrentMessage} 
           onSubmit={handleSubmit} 
-          centered={false} // Pass centered prop
+          centered={false}
+          sessionId={sessionId} // 🔥 NEW: Pass session ID
         />
       </div>
     </div>
   );
 };
-
 
 export default Home;

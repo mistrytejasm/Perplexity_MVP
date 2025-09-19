@@ -143,6 +143,27 @@ class DocumentStore:
     
     def has_documents(self, session_id: str) -> bool:
         """Check if session has any documents"""
-        has_docs = session_id in self.session_documents and len(self.session_documents[session_id]) > 0
-        logger.info(f"Session {session_id} has documents: {has_docs}")
-        return has_docs
+        # 🔥 FIX: Check both session tracking AND ChromaDB
+        
+        # First check session tracking
+        has_session_docs = session_id in self.session_documents and len(self.session_documents[session_id]) > 0
+        
+        # Also check ChromaDB directly as backup
+        try:
+            if not has_session_docs:
+                # Query ChromaDB for any chunks with this session_id
+                results = self.collection.query(
+                    query_texts=["test"],  # dummy query
+                    n_results=1,
+                    where={"session_id": session_id}
+                )
+                has_chroma_docs = len(results['documents'][0]) > 0 if results['documents'] else False
+                
+                logger.info(f"Session {session_id} - Session tracking: {has_session_docs}, ChromaDB: {has_chroma_docs}")
+                return has_chroma_docs
+                
+        except Exception as e:
+            logger.error(f"Error checking ChromaDB for session {session_id}: {e}")
+        
+        logger.info(f"Session {session_id} has documents: {has_session_docs}")
+        return has_session_docs

@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",
+    "autoprefixer": "^10.4.21",
     "lucide-react": "^0.542.0",
     "next": "^15.3.0",
+    "postcss": "^8.5.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-dropzone": "^14.3.8",
@@ -27,10 +29,10 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.13",
     "typescript": "^5"
   }
 }
