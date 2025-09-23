@@ -1,3 +1,4 @@
+python-3.12.6
 langchain
 langgraph
 langchain-tavily
@@ -18,8 +19,8 @@ aiofiles
 chromadb
 PyPDF2
 python-decouple
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
-python-multipart
+# en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
+# python-multipart
 
 # download this for adding citation
 # python -m spacy download en_core_web_sm
