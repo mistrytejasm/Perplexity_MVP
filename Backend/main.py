@@ -8,6 +8,7 @@ import json
 import asyncio
 import logging
 import uuid
+import os
 
 from models.schemas import SearchRequest, SearchResponse, DocumentSearchResult, DocumentUploadResponse, DocumentSearchRequest
 from services.query_analyzer import QueryAnalyzer
@@ -455,9 +456,11 @@ async def search_endpoint(request: SearchRequest):
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run(
         "main:app",
-        port=8000,
-        reload=settings.debug,
+        host="0.0.0.0",
+        port=port,
+        reload=False,
         log_level="info"
     )
