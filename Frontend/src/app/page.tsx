@@ -144,7 +144,7 @@ const Home = () => {
     return merged;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (currentMessage.trim()) {
       // 🔥 NEW: Mark that chat has started
