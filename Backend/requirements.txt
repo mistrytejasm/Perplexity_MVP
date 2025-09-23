@@ -15,7 +15,9 @@ pydantic-settings
 spacy
 sentence-transformers
 aiofile
-
+chromadb
+PyPDF2
+python-decouple
 
 # download this for adding citation
 # python -m spacy download en_core_web_sm
