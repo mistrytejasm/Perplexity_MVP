@@ -190,11 +190,14 @@ const Home = () => {
           }
         ]);
 
-        // 🔥 UPDATED: Add session_id to URL (change this one line)
-        let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
+        // UPDATED: Add session_id to URL (change this one line)
+        // let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
+
+        // for HuggingFace backend URL deployment
+        let url = `https://mistrytejasm-perplexity-mvp.hf.space/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
+
         if (checkpointId) url += `&checkpoint_id=${encodeURIComponent(checkpointId)}`;
 
-        // ... keep the rest of your handleSubmit function exactly as is
         const eventSource = new EventSource(url);
         let streamedContent = "";
 
