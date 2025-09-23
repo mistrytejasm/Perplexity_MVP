@@ -15,7 +15,7 @@ class DocumentStore:
         self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
         
         # Initialize embedding model
-        self.embedding_model = SentenceTransformer('all-mpnet-base-v2')
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         
         # Get or create collection
         self.collection = self.chroma_client.get_or_create_collection(
