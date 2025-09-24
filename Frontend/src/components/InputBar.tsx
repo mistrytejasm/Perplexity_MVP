@@ -9,7 +9,9 @@ interface InputBarProps {
   onSubmit: (e: React.FormEvent) => void;
   centered?: boolean;
   sessionId?: string; 
-  onUploadComplete?: () => void;  
+  onUploadComplete?: () => void;
+  documents?: any[];
+  showDocumentsAboveInput?: boolean;
 }
 
 const InputBar: React.FC<InputBarProps> = ({ 

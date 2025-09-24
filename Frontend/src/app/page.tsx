@@ -447,60 +447,29 @@ const Home = () => {
   });
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
-
-      {/* MISSING FROM YOUR CODE - Document Header */}
-      {true && (
-        <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b shadow-sm">
-          <div className="flex items-center justify-between max-w-4xl mx-auto px-4 py-3">
-            <h1 className="text-lg font-semibold text-gray-800">AI Search Engine</h1>
-
-            <button
-              onClick={() => setShowDocuments(!showDocuments)}
-              className="flex items-center space-x-2 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-full border border-blue-200 transition-colors"
-            >
-              <span>📎</span>
-              <span className="font-medium text-blue-700">
-                {documents.length} document{documents.length > 1 ? 's' : ''}
-              </span>
-              <span className="text-blue-500 text-xs">
-                {showDocuments ? '▼' : '▲'}
-              </span>
-            </button>
-          </div>
-
-          {/* Document list - shows when expanded */}
-          {showDocuments && (
-            <div className="border-t bg-gray-50">
-              <div className="max-w-4xl mx-auto px-4 py-4">
-                <DocumentList
-                  documents={documents}
-                  onRemoveDocument={handleRemoveDocument}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Message Area - adjust padding based on header */}
-      <div className={`flex-1 overflow-y-auto pb-24 ${documents.length > 0 ? 'pt-20' : 'pt-0'}`}>
-        <MessageArea messages={messages} />
-      </div>
-
-      {/* Input Bar - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-10">
-        <InputBar
-          currentMessage={currentMessage}
-          setCurrentMessage={setCurrentMessage}
-          onSubmit={handleSubmit}
-          centered={false}
-          sessionId={sessionId}
-          onUploadComplete={loadDocuments} // ← CRITICAL: Pass this callback
-        />
-      </div>
+  <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
+    {/* Remove the header completely - we'll show docs above input instead */}
+    
+    {/* Message Area - No top padding since no header */}
+    <div className="flex-1 overflow-y-auto pb-24">
+      <MessageArea messages={messages} />
     </div>
-  );
-};
+    
+    {/* Input Bar - Fixed at bottom WITH document display above */}
+    <div className="fixed bottom-0 left-0 right-0 z-10">
+      <InputBar
+        currentMessage={currentMessage}
+        setCurrentMessage={setCurrentMessage}
+        onSubmit={handleSubmit}
+        centered={false}
+        sessionId={sessionId}
+        onUploadComplete={loadDocuments}
+        documents={documents} // 🔥 NEW: Pass documents to InputBar
+        showDocumentsAboveInput={true} // 🔥 NEW: Flag to show docs above input
+      />
+    </div>
+  </div>
+);
 
+}
 export default Home;
