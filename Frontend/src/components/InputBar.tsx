@@ -20,12 +20,12 @@ const InputBar: React.FC<InputBarProps> = ({
   onSubmit,
   centered = false,
   sessionId,
-  onUploadComplete
+  onUploadComplete,
+  documents = [], // 🔥 FIXED: Add this prop
+  showDocumentsAboveInput = false // 🔥 FIXED: Add this prop
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [documentCount, setDocumentCount] = useState(0);
-
   
   const [uploadedDocs, setUploadedDocs] = useState<{
     id: string;
@@ -34,7 +34,6 @@ const InputBar: React.FC<InputBarProps> = ({
     progress?: number;
     error?: string;
   }[]>([]);
-
 
   // 🔧 FIXED: Complete upload function with proper error handling
   const handleFileUploadWithId = async (file: File, uploadId: string) => {
@@ -111,31 +110,48 @@ const InputBar: React.FC<InputBarProps> = ({
     ? "w-full px-6 py-4 text-sm" 
     : "px-4 py-3";
 
+  // 🔧 FIXED: Calculate total document count properly
+  const totalDocumentCount = (documents?.length || 0) + uploadedDocs.filter(doc => doc.status === 'ready').length;
+
   return (
     <div className={containerClasses}>
       <div className={innerContainerClasses}>
-        {/* 📄 Compact Document Chips */}
+        {/* 🔥 UPDATED: Show documents from parent state when in chat mode */}
+        {/* CHAT MODE: Show documents from parent state */}
+        {showDocumentsAboveInput && documents.length > 0 && (
+          <div className="mb-3">
+            <div className="flex flex-wrap gap-2">
+              {documents.map((doc, index) => (
+                <div key={`doc-${index}`} className="flex items-center bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm max-w-[300px]">
+                  <FileText className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
+                  <span className="text-blue-800 truncate mr-2 font-medium">
+                    {doc.filename}
+                  </span>
+                  <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center mr-2">
+                    <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PRE-CHAT MODE: Show uploadedDocs (always show if there are any) */}
         {uploadedDocs.length > 0 && (
           <div className={`mb-3 ${centered ? 'mb-4' : ''}`}>
             <div className="flex flex-wrap gap-2">
               {uploadedDocs.map((doc) => (
                 <div key={doc.id} className="flex items-center bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 text-xs max-w-[200px]">
-                  {/* Document Icon - Smaller */}
                   <FileText className="w-3 h-3 text-blue-600 mr-1.5 flex-shrink-0" />
-                  
-                  {/* Document Name - Truncated */}
                   <span className="text-blue-800 truncate mr-2 font-medium">
                     {doc.filename.length > 20 ? `${doc.filename.substring(0, 20)}...` : doc.filename}
                   </span>
-                  
-                  {/* Status Indicator - Compact */}
                   <div className="flex items-center mr-1.5">
-                    {/* Loading Animation */}
                     {(doc.status === 'uploading' || doc.status === 'processing') && (
                       <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                     )}
-                    
-                    {/* Success Checkmark */}
                     {doc.status === 'ready' && (
                       <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
                         <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -143,8 +159,6 @@ const InputBar: React.FC<InputBarProps> = ({
                         </svg>
                       </div>
                     )}
-                    
-                    {/* Error X */}
                     {doc.status === 'error' && (
                       <div className="w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
                         <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -153,8 +167,6 @@ const InputBar: React.FC<InputBarProps> = ({
                       </div>
                     )}
                   </div>
-                  
-                  {/* Remove Button - Compact */}
                   <button
                     onClick={() => setUploadedDocs(prev => prev.filter(d => d.id !== doc.id))}
                     className="text-blue-400 hover:text-blue-600 transition-colors flex-shrink-0"
@@ -202,9 +214,10 @@ const InputBar: React.FC<InputBarProps> = ({
               title="Upload document"
             >
               <Paperclip className="w-4 h-4" />
-              {documentCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
-                  {documentCount}
+              {/* 🔥 FIXED: Show total document count */}
+              {totalDocumentCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                  {totalDocumentCount}
                 </div>
               )}
             </button>
