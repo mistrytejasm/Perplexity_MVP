@@ -62,7 +62,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ sessionId, onUploadComp
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      const response = await fetch('http://localhost:8000/documents/upload', {
+      const response = await fetch('https://mistrytejasm-perplexity-mvp.hf.space/documents/upload', {
         method: 'POST',
         body: formData,
       });

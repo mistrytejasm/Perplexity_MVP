@@ -1,9 +1,11 @@
 "use client"
 import InputBar from '@/components/InputBar';
 import MessageArea from '@/components/MessageArea';
-import React, { useState, useEffect } from 'react'; // 🔥 Add useEffect
+import React, { useState, useEffect } from 'react';
+import DocumentUpload from '@/components/DocumentUpload';
+import DocumentList from '@/components/DocumentList';
 
-// 🔥 NEW: Simple session ID generator (add this one function)
+// Simple session ID generator
 const generateSessionId = () => 'session_' + Date.now();
 
 interface SearchInfo {
@@ -33,22 +35,60 @@ const Home = () => {
   const [checkpointId, setCheckpointId] = useState(null);
   const [hasStartedChat, setHasStartedChat] = useState(false);
   const [sessionId, setSessionId] = useState(''); 
+  const [documents, setDocuments] = useState([]);
+  const [showDocuments, setShowDocuments] = useState(false);
 
-  // 🔥 NEW: Initialize session (add this one useEffect)
+  // Load documents for current session
+  const loadDocuments = async () => {
+    if (!sessionId) return; // Don't load if no session ID yet
+    
+    try {
+      const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
+      const data = await response.json();
+      setDocuments(data.documents || []);
+    } catch (error) {
+      console.error('Error loading documents:', error);
+    }
+  };
+
+  // Handle document upload completion
+  const handleUploadComplete = () => {
+    loadDocuments(); // Refresh document list
+  };
+
+  // Handle document removal
+  const handleRemoveDocument = async (documentId: string) => {
+    try {
+      await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/${documentId}?session_id=${sessionId}`, {
+        method: 'DELETE'
+      });
+      loadDocuments(); // Refresh document list
+    } catch (error) {
+      console.error('Error removing document:', error);
+    }
+  };
+
+  // Initialize session and load documents
   useEffect(() => {
-  const existingSession = localStorage.getItem('perplexity_session_id');
-  if (existingSession) {
-    setSessionId(existingSession);
-  } else {
-    const newSession = generateSessionId();
-    setSessionId(newSession);
-    localStorage.setItem('perplexity_session_id', newSession);
-  }
+    const existingSession = localStorage.getItem('perplexity_session_id');
+    if (existingSession) {
+      setSessionId(existingSession);
+    } else {
+      const newSession = generateSessionId();
+      setSessionId(newSession);
+      localStorage.setItem('perplexity_session_id', newSession);
+    }
   }, []);
+
+  // Load documents when sessionId changes
+  useEffect(() => {
+    if (sessionId) {
+      loadDocuments();
+    }
+  }, [sessionId]);
 
   // Helper function to merge search info incrementally
   const mergeSearchInfo = (existing: SearchInfo | undefined, newData: any): SearchInfo => {
-    // ... keep your existing mergeSearchInfo function exactly as is
     const merged: SearchInfo = {
       stages: [...(existing?.stages || [])],
       query: existing?.query || "",
@@ -147,10 +187,11 @@ const Home = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (currentMessage.trim()) {
-      // 🔥 NEW: Mark that chat has started
+      // Mark that chat has started
       if (!hasStartedChat) {
         setHasStartedChat(true);
       }
+      
       // First add the user message to the chat
       const newMessageId = messages.length > 0 ? Math.max(...messages.map(msg => msg.id)) + 1 : 1;
       setMessages(prev => [
@@ -190,12 +231,8 @@ const Home = () => {
           }
         ]);
 
-        // UPDATED: Add session_id to URL (change this one line)
-        // let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
-
-        // for HuggingFace backend URL deployment
+        // HuggingFace backend URL
         let url = `https://mistrytejasm-perplexity-mvp.hf.space/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
-
         if (checkpointId) url += `&checkpoint_id=${encodeURIComponent(checkpointId)}`;
 
         const eventSource = new EventSource(url);
@@ -373,47 +410,102 @@ const Home = () => {
     }
   };
 
-  // 🔥 NEW: Render different layouts based on chat state
+  // PRE-CHAT SCREEN: Show upload area and search input
   if (!hasStartedChat) {
     return (
       <div className="min-h-screen bg-[#FCFCF8] flex flex-col items-center justify-center px-6 -mt-16">
-        {/* Compact Logo/Title */}
+        {/* Logo/Title */}
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-semibold text-gray-800 mb-1">
             AI Search Engine
           </h1>
           <p className="text-sm text-gray-500">Where Knowledge Begins</p>
         </div>
-        {/* Compact Input - Choose your preferred width */}
+        
+        {/* Document Upload Section */}
+        <div className="w-full max-w-4xl mx-8 mb-8">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Documents</h2>
+              <button
+                onClick={() => setShowDocuments(!showDocuments)}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                {showDocuments ? 'Hide' : 'Show'} ({documents.length})
+              </button>
+            </div>
+            
+            {showDocuments && sessionId && (
+              <div className="space-y-6">
+                <DocumentUpload 
+                  sessionId={sessionId} 
+                  onUploadComplete={handleUploadComplete}
+                />
+                <DocumentList 
+                  documents={documents}
+                  onRemoveDocument={handleRemoveDocument}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Search Input */}
         <div className="w-full max-w-lg mx-8"> 
           <InputBar 
             currentMessage={currentMessage} 
             setCurrentMessage={setCurrentMessage} 
             onSubmit={handleSubmit}
             centered={true}
-            sessionId={sessionId} // 🔥 NEW: Pass session ID
+            sessionId={sessionId}
           />
         </div>
       </div>
     );
   }
 
-  // Chat interface with input at bottom
+  // CHAT SCREEN: Show chat with document toggle in header
   return (
     <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
-      {/* Message Area - Full height with bottom padding for fixed input */}
-      <div className="flex-1 overflow-y-auto pb-24">
+      {/* Header with document toggle */}
+      <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b p-4">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <h1 className="text-lg font-semibold">AI Search Engine</h1>
+          <button
+            onClick={() => setShowDocuments(!showDocuments)}
+            className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+          >
+            <span>📎 Documents ({documents.length})</span>
+          </button>
+        </div>
+        
+        {showDocuments && (
+          <div className="max-w-4xl mx-auto mt-4 bg-gray-50 rounded-lg p-4 space-y-4">
+            <DocumentUpload 
+              sessionId={sessionId} 
+              onUploadComplete={handleUploadComplete}
+            />
+            <DocumentList 
+              documents={documents}
+              onRemoveDocument={handleRemoveDocument}
+            />
+          </div>
+        )}
+      </div>
+      
+      {/* Message Area - with top padding for fixed header */}
+      <div className="flex-1 overflow-y-auto pt-20 pb-24">
         <MessageArea messages={messages} />
       </div>
       
-      {/* Input Bar - Fixed at bottom of viewport */}
+      {/* Input Bar - Fixed at bottom */}
       <div className="fixed bottom-0 left-0 right-0 z-10">
         <InputBar 
           currentMessage={currentMessage} 
           setCurrentMessage={setCurrentMessage} 
           onSubmit={handleSubmit} 
           centered={false}
-          sessionId={sessionId} // 🔥 NEW: Pass session ID
+          sessionId={sessionId}
         />
       </div>
     </div>
