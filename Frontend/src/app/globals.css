@@ -135,3 +135,31 @@ pre::-webkit-scrollbar-thumb:hover {
 .copy-success {
   animation: copySuccess 0.3s ease-in-out;
 }
+/* ADD THESE CSS RULES */
+.scroll-smooth {
+    scroll-behavior: smooth;
+}
+
+/* Ensure smooth scrolling works globally */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom scrollbar styling (optional) */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

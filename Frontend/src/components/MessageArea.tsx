@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -457,8 +457,62 @@ interface MessageAreaProps {
     messages: Message[];
 }
 const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
+
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
+    const [showScrollButton, setShowScrollButton] = useState(false);
+
+    // Auto-scroll function
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'end'
+        });
+    };
+
+    // Manual scroll to bottom (for button)
+    const scrollToBottomInstant = () => {
+        messagesEndRef.current?.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'end'
+        });
+        setShowScrollButton(false);
+    };
+
+    // Check if user is at bottom
+    const handleScroll = () => {
+        if (containerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+            const atBottom = scrollHeight - scrollTop - clientHeight < 50;
+            setIsAtBottom(atBottom);
+            setShowScrollButton(!atBottom && messages.length > 3);
+        }
+    };
+
+    // Auto-scroll whenever messages change (only if at bottom)
+    useEffect(() => {
+        if (isAtBottom) {
+            setTimeout(scrollToBottom, 100);
+        }
+    }, [messages, isAtBottom]);
+
+    // Auto-scroll when message content updates (streaming)
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && !lastMessage.isUser && isAtBottom) {
+            scrollToBottom();
+        }
+    }, [messages, isAtBottom]);
+
     return (
-        <div className="bg-[#FCFCF8] px-4 py-6">
+        // <div className="bg-[#FCFCF8] px-4 py-6">
+
+        <div 
+        ref={containerRef}
+            onScroll={handleScroll} 
+            className="flex-1 overflow-y-auto bg-[#FCFCF8] px-4 py-6 relative"  
+        >
             {/* Center the conversation with max width like Perplexity */}
             <div className="max-w-3xl mx-auto">
                 {messages.map((message) => (
@@ -494,7 +548,25 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
                 
                 {/* Extra bottom spacing so last message isn't hidden behind fixed input */}
                 <div className="h-6"></div>
+                <div ref={messagesEndRef} />
             </div>
+            {/* 🔥 ADD SCROLL TO BOTTOM BUTTON */}
+            {showScrollButton && (
+                <button
+                    onClick={scrollToBottomInstant}
+                    className="fixed bottom-24 right-8 w-12 h-12 bg-white border border-gray-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-20 hover:bg-gray-50"
+                    title="Scroll to bottom"
+                >
+                    <svg 
+                        className="w-5 h-5 text-gray-600" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                </button>
+            )}
         </div>
     );
 };

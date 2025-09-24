@@ -86,6 +86,7 @@ const InputBar: React.FC<InputBarProps> = ({
       textareaRef.current.focus();
     }
   }, [centered]);
+  
 
   // Handle submit from button click
   const handleSendClick = () => {
