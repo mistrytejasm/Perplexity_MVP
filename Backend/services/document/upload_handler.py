@@ -11,14 +11,19 @@ logger = logging.getLogger(__name__)
 
 class DocumentUploadHandler:
     def __init__(self):
-        self.upload_dir = "storage/uploads"
+        self.upload_dir = "/tmp/uploads"
+        self.allowed_extensions = {".pdf", ".txt", ".docx", ".doc"}
+        self.allowed_types = {"application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"} 
         self.max_file_size = 50 * 1024 * 1024  # 50MB
-        self.allowed_types = {
-            "application/pdf": ".pdf"
-        }
         
-        # Create upload directory if it doesn't exist
-        os.makedirs(self.upload_dir, exist_ok=True)
+        try:
+            os.makedirs(self.upload_dir, exist_ok=True)
+            logger.info(f"✅ Upload directory created: {self.upload_dir}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not create upload directory: {e}")
+            import tempfile
+            self.upload_dir = tempfile.gettempdir()
+            logger.info(f"📁 Using system temp directory: {self.upload_dir}")
     
     async def validate_and_save_file(self, file: UploadFile) -> tuple[str, str, str]:
         """Validate file and save to disk. Returns (file_path, file_id, file_hash)"""
