@@ -1,5 +1,36 @@
 @import "tailwindcss";
 
+
+/* 🔥 UNIVERSAL INPUT TEXT  */
+input, textarea {
+  color: #000000 !important;
+  caret-color: #000000 !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Specific override for search inputs */
+.search-input {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  caret-color: #000000 !important;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  input, textarea {
+    color: #ffffff !important;
+    background-color: #1f1f1f !important;
+    caret-color: #ffffff !important;
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: #9ca3af !important;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

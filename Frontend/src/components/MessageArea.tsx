@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import CitationRenderer from './CitationRenderer';
+
 
 const PremiumTypingAnimation = () => {
     return (
@@ -416,7 +418,6 @@ const parseMarkdown = (content: string) => {
                 </h4>
             );
         }
-        // Handle list items
         // Add asterisk pattern detection
         else if (trimmed.startsWith('* ') || trimmed.startsWith('• ') || trimmed.startsWith('- ') || /^\d+\.\s/.test(trimmed)) {
             flushTable();
@@ -550,7 +551,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
                 <div className="h-6"></div>
                 <div ref={messagesEndRef} />
             </div>
-            {/* 🔥 ADD SCROLL TO BOTTOM BUTTON */}
+            {/* ADD SCROLL TO BOTTOM BUTTON */}
             {showScrollButton && (
                 <button
                     onClick={scrollToBottomInstant}
