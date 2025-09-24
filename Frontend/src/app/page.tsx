@@ -2,8 +2,8 @@
 import InputBar from '@/components/InputBar';
 import MessageArea from '@/components/MessageArea';
 import React, { useState, useEffect } from 'react';
-import DocumentUpload from '@/components/DocumentUpload';
-import DocumentList from '@/components/DocumentList';
+import DocumentUpload from '@/components/document/DocumentUpload';
+import DocumentList from '@/components/document/DocumentList';
 
 // Simple session ID generator
 const generateSessionId = () => 'session_' + Date.now();
