@@ -22,6 +22,9 @@ const InputBar: React.FC<InputBarProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [documentCount, setDocumentCount] = useState(0);
+
+  
   const [uploadedDocs, setUploadedDocs] = useState<{
     id: string;
     filename: string;
@@ -29,6 +32,7 @@ const InputBar: React.FC<InputBarProps> = ({
     progress?: number;
     error?: string;
   }[]>([]);
+
 
   // 🔧 FIXED: Complete upload function with proper error handling
   const handleFileUploadWithId = async (file: File, uploadId: string) => {
@@ -62,7 +66,7 @@ const InputBar: React.FC<InputBarProps> = ({
         if (onUploadComplete) {
           setTimeout(() => {
             onUploadComplete();
-          }, 1000);
+          }, 3000);
         }
       } else {
         throw new Error('Upload failed');
@@ -73,7 +77,7 @@ const InputBar: React.FC<InputBarProps> = ({
         doc.id === uploadId ? { ...doc, status: 'error' } : doc
       ));
     }
-  }; // 🔧 FIXED: Added missing closing brace and semicolon
+  }; 
 
   // Auto-focus input when centered
   useEffect(() => {
@@ -196,9 +200,9 @@ const InputBar: React.FC<InputBarProps> = ({
               title="Upload document"
             >
               <Paperclip className="w-4 h-4" />
-              {uploadedDocs.filter(doc => doc.status === 'ready').length > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
-                  {uploadedDocs.filter(doc => doc.status === 'ready').length}
+              {documentCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                  {documentCount}
                 </div>
               )}
             </button>

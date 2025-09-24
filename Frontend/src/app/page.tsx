@@ -450,7 +450,7 @@ const Home = () => {
     <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
 
       {/* MISSING FROM YOUR CODE - Document Header */}
-      {documents.length > 0 && (
+      {true && (
         <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b shadow-sm">
           <div className="flex items-center justify-between max-w-4xl mx-auto px-4 py-3">
             <h1 className="text-lg font-semibold text-gray-800">AI Search Engine</h1>
