@@ -270,5 +270,6 @@ const InputBar: React.FC<InputBarProps> = ({
     </div>
   );
 };
+}
 
 export default InputBar;
