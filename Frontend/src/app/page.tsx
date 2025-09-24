@@ -2,7 +2,6 @@
 import InputBar from '@/components/InputBar';
 import MessageArea from '@/components/MessageArea';
 import React, { useState, useEffect } from 'react';
-import DocumentUpload from '@/components/document/DocumentUpload';
 import DocumentList from '@/components/document/DocumentList';
 
 // Simple session ID generator
@@ -40,7 +39,7 @@ const Home = () => {
 
   // Load documents for current session
   const loadDocuments = async () => {
-    if (!sessionId) return; // Don't load if no session ID yet
+    if (!sessionId) return;
     
     try {
       const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
@@ -49,11 +48,6 @@ const Home = () => {
     } catch (error) {
       console.error('Error loading documents:', error);
     }
-  };
-
-  // Handle document upload completion
-  const handleUploadComplete = () => {
-    loadDocuments(); // Refresh document list
   };
 
   // Handle document removal
@@ -410,7 +404,7 @@ const Home = () => {
     }
   };
 
-  // PRE-CHAT SCREEN: Show upload area and search input
+  // PRE-CHAT SCREEN: Clean and simple
   if (!hasStartedChat) {
     return (
       <div className="min-h-screen bg-[#FCFCF8] flex flex-col items-center justify-center px-6 -mt-16">
@@ -421,34 +415,6 @@ const Home = () => {
           </h1>
           <p className="text-sm text-gray-500">Where Knowledge Begins</p>
         </div>
-        
-        {/* Document Upload Section */}
-        <div className="w-full max-w-4xl mx-8 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">Documents</h2>
-              <button
-                onClick={() => setShowDocuments(!showDocuments)}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                {showDocuments ? 'Hide' : 'Show'} ({documents.length})
-              </button>
-            </div>
-            
-            {showDocuments && sessionId && (
-              <div className="space-y-6">
-                <DocumentUpload 
-                  sessionId={sessionId} 
-                  onUploadComplete={handleUploadComplete}
-                />
-                <DocumentList 
-                  documents={documents}
-                  onRemoveDocument={handleRemoveDocument}
-                />
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Search Input */}
         <div className="w-full max-w-lg mx-8"> 
@@ -458,43 +424,42 @@ const Home = () => {
             onSubmit={handleSubmit}
             centered={true}
             sessionId={sessionId}
+            onUploadComplete={loadDocuments} // Pass this so InputBar can refresh documents
           />
         </div>
       </div>
     );
   }
 
-  // CHAT SCREEN: Show chat with document toggle in header
+  // CHAT SCREEN: With document list in header when needed
   return (
     <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
-      {/* Header with document toggle */}
-      <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b p-4">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <h1 className="text-lg font-semibold">AI Search Engine</h1>
-          <button
-            onClick={() => setShowDocuments(!showDocuments)}
-            className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
-          >
-            <span>📎 Documents ({documents.length})</span>
-          </button>
-        </div>
-        
-        {showDocuments && (
-          <div className="max-w-4xl mx-auto mt-4 bg-gray-50 rounded-lg p-4 space-y-4">
-            <DocumentUpload 
-              sessionId={sessionId} 
-              onUploadComplete={handleUploadComplete}
-            />
-            <DocumentList 
-              documents={documents}
-              onRemoveDocument={handleRemoveDocument}
-            />
+      {/* Header with document toggle (only show if documents exist) */}
+      {documents.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b p-4">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <h1 className="text-lg font-semibold">AI Search Engine</h1>
+            <button
+              onClick={() => setShowDocuments(!showDocuments)}
+              className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+            >
+              <span>📎 Documents ({documents.length})</span>
+            </button>
           </div>
-        )}
-      </div>
+          
+          {showDocuments && (
+            <div className="max-w-4xl mx-auto mt-4 bg-gray-50 rounded-lg p-4">
+              <DocumentList 
+                documents={documents}
+                onRemoveDocument={handleRemoveDocument}
+              />
+            </div>
+          )}
+        </div>
+      )}
       
-      {/* Message Area - with top padding for fixed header */}
-      <div className="flex-1 overflow-y-auto pt-20 pb-24">
+      {/* Message Area */}
+      <div className={`flex-1 overflow-y-auto pb-24 ${documents.length > 0 ? 'pt-20' : 'pt-4'}`}>
         <MessageArea messages={messages} />
       </div>
       
@@ -506,6 +471,7 @@ const Home = () => {
           onSubmit={handleSubmit} 
           centered={false}
           sessionId={sessionId}
+          onUploadComplete={loadDocuments} // Pass this so InputBar can refresh documents
         />
       </div>
     </div>
