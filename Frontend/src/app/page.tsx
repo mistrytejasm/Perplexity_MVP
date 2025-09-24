@@ -34,8 +34,8 @@ const Home = () => {
   const [checkpointId, setCheckpointId] = useState(null);
   const [hasStartedChat, setHasStartedChat] = useState(false);
   const [sessionId, setSessionId] = useState('');
-  const [documents, setDocuments] = useState([]);
-  const [showDocuments, setShowDocuments] = useState(false);
+  const [documents, setDocuments] = useState([]); // ← MISSING IN YOUR CODE
+  const [showDocuments, setShowDocuments] = useState(false); // ← MISSING IN YOUR CODE
 
   // Add this useEffect to debug document state changes
   useEffect(() => {
@@ -47,36 +47,13 @@ const Home = () => {
     });
   }, [documents, sessionId, hasStartedChat]);
 
-  // Also add debug to loadDocuments function
+  // MISSING FROM YOUR CODE - This is critical!
   const loadDocuments = async () => {
-    if (!sessionId) {
-      console.log('🔍 DEBUG - No sessionId, skipping loadDocuments');
-      return;
-    }
-
-    console.log('🔍 DEBUG - Loading documents for session:', sessionId);
-    console.log('🔍 DEBUG - API URL will be:', `https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
-
+    if (!sessionId) return;
+    
     try {
       const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
-      console.log('🔍 DEBUG - Response status:', response.status);
-      console.log('🔍 DEBUG - Response ok:', response.ok);
-      
       const data = await response.json();
-      console.log('🔍 DEBUG - Raw API response:', data);
-      console.log('🔍 DEBUG - data.documents:', data.documents);
-      console.log('🔍 DEBUG - data.documents type:', typeof data.documents);
-      console.log('🔍 DEBUG - data.documents length:', data.documents?.length);
-      console.log('🔍 DEBUG - Is array?', Array.isArray(data.documents));
-      
-      // 🔧 FIX: Add more detailed inspection
-      if (data.documents && Array.isArray(data.documents)) {
-        console.log('🔍 DEBUG - Documents array content:', data.documents);
-        data.documents.forEach((doc, index) => {
-          console.log(`🔍 DEBUG - Document ${index}:`, doc);
-        });
-      }
-      
       setDocuments(data.documents || []);
     } catch (error) {
       console.error('Error loading documents:', error);
@@ -84,8 +61,7 @@ const Home = () => {
   };
 
 
-
-  // Handle document removal
+  // MISSING FROM YOUR CODE - This is critical!
   const handleRemoveDocument = async (documentId: string) => {
     try {
       await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/${documentId}?session_id=${sessionId}`, {
@@ -109,14 +85,14 @@ const Home = () => {
     }
   }, []);
 
-  // Load documents when sessionId changes
+  // MISSING FROM YOUR CODE - Load documents when sessionId changes
   useEffect(() => {
     if (sessionId) {
       loadDocuments();
     }
   }, [sessionId]);
 
-  // Helper function to merge search info incrementally
+  // Your existing mergeSearchInfo function...
   const mergeSearchInfo = (existing: SearchInfo | undefined, newData: any): SearchInfo => {
     const merged: SearchInfo = {
       stages: [...(existing?.stages || [])],
@@ -130,7 +106,6 @@ const Home = () => {
       error: existing?.error
     };
 
-    // Merge stages uniquely
     if (newData.type && !merged.stages.includes(newData.type)) {
       if (newData.type === 'search_start') merged.stages.push('searching');
       if (newData.type === 'query_breakdown') merged.stages.push('searching');
@@ -139,14 +114,10 @@ const Home = () => {
       if (newData.type === 'search_error') merged.stages.push('error');
     }
 
-    // Update query
     if (newData.query) merged.query = newData.query;
     if (newData.original_query) merged.query = newData.original_query;
-
-    // Update source
     if (newData.source) merged.source = newData.source;
 
-    // Merge sub-queries uniquely
     if (newData.sub_queries) {
       newData.sub_queries.forEach((sq: string) => {
         if (!merged.subQueries.includes(sq)) {
@@ -155,7 +126,6 @@ const Home = () => {
       });
     }
 
-    // Merge web sources uniquely (by URL)
     if (newData.web_sources) {
       newData.web_sources.forEach((ws: any) => {
         if (!merged.webSources.find(existing => existing.url === ws.url)) {
@@ -164,7 +134,6 @@ const Home = () => {
       });
     }
 
-    // Merge document sources uniquely (by filename)
     if (newData.document_sources) {
       newData.document_sources.forEach((ds: any) => {
         if (!merged.documentSources.find(existing => existing.filename === ds.filename)) {
@@ -173,7 +142,6 @@ const Home = () => {
       });
     }
 
-    // Merge URLs uniquely
     if (newData.urls) {
       const urlsArray = typeof newData.urls === 'string' ? JSON.parse(newData.urls) : newData.urls;
       urlsArray.forEach((url: string) => {
@@ -182,7 +150,6 @@ const Home = () => {
         }
       });
 
-      // Also add to webSources for display
       urlsArray.forEach((url: string) => {
         const domain = url.split('//')[1]?.split('/')[0] || 'unknown';
         if (!merged.webSources.find(ws => ws.url === url)) {
@@ -191,7 +158,6 @@ const Home = () => {
       });
     }
 
-    // Merge sources uniquely
     if (newData.sources) {
       newData.sources.forEach((source: string) => {
         if (!merged.sources.includes(source)) {
@@ -199,7 +165,6 @@ const Home = () => {
         }
       });
 
-      // Also add to documentSources for display
       newData.sources.forEach((source: string) => {
         if (!merged.documentSources.find(ds => ds.filename === source)) {
           merged.documentSources.push({ filename: source });
@@ -207,7 +172,6 @@ const Home = () => {
       });
     }
 
-    // Update error
     if (newData.error) merged.error = newData.error;
 
     return merged;
@@ -219,7 +183,7 @@ const Home = () => {
       // Mark that chat has started
       if (!hasStartedChat) {
         setHasStartedChat(true);
-        // 🔧 FIX: Force reload documents when starting chat
+        // CRITICAL FIX: Force reload documents when starting chat
         setTimeout(() => {
           console.log('🔍 DEBUG - Force loading documents on chat start');
           loadDocuments();
@@ -271,6 +235,8 @@ const Home = () => {
 
         const eventSource = new EventSource(url);
         let streamedContent = "";
+
+        // ... Your existing EventSource handling code stays exactly the same
 
         eventSource.onmessage = (event) => {
           try {
@@ -464,19 +430,27 @@ const Home = () => {
             onSubmit={handleSubmit}
             centered={true}
             sessionId={sessionId}
-            onUploadComplete={loadDocuments} // Pass this so InputBar can refresh documents
+            onUploadComplete={loadDocuments} // ← CRITICAL: Pass this callback
           />
         </div>
       </div>
     );
   }
 
+  console.log('🔍 HEADER DEBUG:', {
+    'documents': documents,
+    'documents.length': documents.length,
+    'typeof documents': typeof documents,
+    'Array.isArray(documents)': Array.isArray(documents),
+    'sessionId': sessionId,
+    'hasStartedChat': hasStartedChat
+  });
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
-      
-      {/* Document Header - ONLY show when documents exist */}
-      {true && (
+
+      {/* MISSING FROM YOUR CODE - Document Header */}
+      {documents.length > 0 && (
         <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b shadow-sm">
           <div className="flex items-center justify-between max-w-4xl mx-auto px-4 py-3">
             <h1 className="text-lg font-semibold text-gray-800">AI Search Engine</h1>
@@ -487,7 +461,7 @@ const Home = () => {
             >
               <span>📎</span>
               <span className="font-medium text-blue-700">
-                {documents.length} document{documents.length > 1 ? 's' : ''} (Debug: {JSON.stringify(documents.length)})
+                {documents.length} document{documents.length > 1 ? 's' : ''}
               </span>
               <span className="text-blue-500 text-xs">
                 {showDocuments ? '▼' : '▲'}
@@ -522,11 +496,11 @@ const Home = () => {
           onSubmit={handleSubmit}
           centered={false}
           sessionId={sessionId}
-          onUploadComplete={loadDocuments} // Make sure you pass this
+          onUploadComplete={loadDocuments} // ← CRITICAL: Pass this callback
         />
       </div>
     </div>
   );
-}
+};
 
-  export default Home;
+export default Home;
