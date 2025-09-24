@@ -8,7 +8,8 @@ interface InputBarProps {
   setCurrentMessage: (message: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   centered?: boolean;
-  sessionId?: string; // 🔥 NEW: Only this prop added
+  sessionId?: string;
+  onUploadComplete?: () => void;
 }
 
 const InputBar: React.FC<InputBarProps> = ({ 
@@ -16,7 +17,8 @@ const InputBar: React.FC<InputBarProps> = ({
   setCurrentMessage, 
   onSubmit,
   centered = false,
-  sessionId // 🔥 NEW: Only this added
+  sessionId,
+  onUploadComplete
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); // 🔥 NEW: Only this added
@@ -28,11 +30,10 @@ const InputBar: React.FC<InputBarProps> = ({
   error?: string;
   }[]>([]);
 
-  // 🔥 UPDATED: Modified to accept uploadId parameter
   const handleFileUploadWithId = async (file: File, uploadId: string) => {
     if (!file || !sessionId) return;
 
-    console.log('Starting upload for:', file.name); // 🔥 DEBUG
+    console.log('Starting upload for:', file.name);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -45,17 +46,21 @@ const InputBar: React.FC<InputBarProps> = ({
       ));
 
       const response = await fetch('https://mistrytejasm-perplexity-mvp.hf.space/documents/upload', {
-
         method: 'POST',
         body: formData,
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Upload successful:', result); // 🔥 DEBUG
+        console.log('Upload successful:', result);
         setUploadedDocs(prev => prev.map(doc => 
           doc.id === uploadId ? { ...doc, status: 'ready' } : doc
         ));
+        
+        // 🔧 FIX: Call the callback to refresh document list
+        if (onUploadComplete) {
+          onUploadComplete();
+        }
       } else {
         throw new Error('Upload failed');
       }
@@ -166,7 +171,15 @@ const InputBar: React.FC<InputBarProps> = ({
             accept=".pdf"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) handleFileUpload(file);
+              if (file) {
+                const uploadId = Date.now().toString();
+                setUploadedDocs(prev => [...prev, {
+                  id: uploadId,
+                  filename: file.name,
+                  status: 'uploading'
+                }]);
+                handleFileUploadWithId(file, uploadId);
+              }
             }}
             className="hidden"
           />
