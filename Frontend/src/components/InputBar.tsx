@@ -44,7 +44,8 @@ const InputBar: React.FC<InputBarProps> = ({
         doc.id === uploadId ? { ...doc, status: 'processing' } : doc
       ));
 
-      const response = await fetch('http://localhost:8000/documents/upload', {
+      const response = await fetch('https://mistrytejasm-perplexity-mvp.hf.space/documents/upload', {
+
         method: 'POST',
         body: formData,
       });
