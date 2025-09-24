@@ -22,22 +22,19 @@ const InputBar: React.FC<InputBarProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [documents, setDocuments] = useState([]);
-  const [showDocuments, setShowDocuments] = useState(false);
- 
   const [uploadedDocs, setUploadedDocs] = useState<{
-  id: string;
-  filename: string;
-  status: 'uploading' | 'processing' | 'ready' | 'error';
-  progress?: number;
-  error?: string;
+    id: string;
+    filename: string;
+    status: 'uploading' | 'processing' | 'ready' | 'error';
+    progress?: number;
+    error?: string;
   }[]>([]);
 
-  // 🔥 UPDATED: Modified to accept uploadId parameter
+  // 🔧 FIXED: Complete upload function with proper error handling
   const handleFileUploadWithId = async (file: File, uploadId: string) => {
     if (!file || !sessionId) return;
 
-    console.log('Starting upload for:', file.name); // 🔥 DEBUG
+    console.log('Starting upload for:', file.name);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -70,9 +67,13 @@ const InputBar: React.FC<InputBarProps> = ({
       } else {
         throw new Error('Upload failed');
       }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadedDocs(prev => prev.map(doc => 
+        doc.id === uploadId ? { ...doc, status: 'error' } : doc
+      ));
     }
-
-
+  }; // 🔧 FIXED: Added missing closing brace and semicolon
 
   // Auto-focus input when centered
   useEffect(() => {
@@ -107,7 +108,6 @@ const InputBar: React.FC<InputBarProps> = ({
   return (
     <div className={containerClasses}>
       <div className={innerContainerClasses}>
-        {/* 🔥 NEW: Only this section added - show uploaded docs above input when not centered */}
         {/* 📄 Compact Document Chips */}
         {uploadedDocs.length > 0 && (
           <div className={`mb-3 ${centered ? 'mb-4' : ''}`}>
@@ -162,20 +162,9 @@ const InputBar: React.FC<InputBarProps> = ({
           </div>
         )}
 
-        {/* Perplexity-style Input Container - UNCHANGED */}
+        {/* Input Container */}
         <div className="relative">
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileUpload(file);
-            }}
-            className="hidden"
-          />
-          {/* Full Width Textarea - No Send Button on Side - UNCHANGED */}
+          {/* Form */}
           <form onSubmit={onSubmit}>
             <TextareaAutosize
               ref={textareaRef}
@@ -197,9 +186,9 @@ const InputBar: React.FC<InputBarProps> = ({
             />
           </form>
 
-          {/* Bottom Button Bar (Like Perplexity) - UNCHANGED except onclick */}
+          {/* Bottom Button Bar */}
           <div className="absolute bottom-3 right-4 flex items-center space-x-3">
-            {/* Attachment Button - 🔥 NEW: Only added onClick functionality */}
+            {/* Attachment Button */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -214,8 +203,7 @@ const InputBar: React.FC<InputBarProps> = ({
               )}
             </button>
 
-
-            {/* Microphone Button - UNCHANGED */}
+            {/* Microphone Button */}
             <button
               type="button"
               className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
@@ -224,7 +212,7 @@ const InputBar: React.FC<InputBarProps> = ({
               <Mic className="w-4 h-4" />
             </button>
 
-            {/* Send Button (Small & Round) - UNCHANGED */}
+            {/* Send Button */}
             <button
               type="button"
               onClick={handleSendClick}
@@ -236,7 +224,7 @@ const InputBar: React.FC<InputBarProps> = ({
             </button>
           </div>
 
-          {/* 🔥 UPDATED: Show file immediately when selected */}
+          {/* Hidden File Input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -263,13 +251,10 @@ const InputBar: React.FC<InputBarProps> = ({
             }}
             className="hidden"
           />
-
-
         </div>
       </div>
     </div>
   );
 };
-}
 
 export default InputBar;
