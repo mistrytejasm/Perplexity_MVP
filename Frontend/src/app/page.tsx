@@ -37,18 +37,36 @@ const Home = () => {
   const [documents, setDocuments] = useState([]);
   const [showDocuments, setShowDocuments] = useState(false);
 
-  // Load documents for current session
+  // Add this useEffect to debug document state changes
+  useEffect(() => {
+    console.log('🔍 DEBUG - Documents state changed:', {
+      documentsCount: documents.length,
+      documents: documents,
+      sessionId: sessionId,
+      hasStartedChat: hasStartedChat
+    });
+  }, [documents, sessionId, hasStartedChat]);
+
+  // Also add debug to loadDocuments function
   const loadDocuments = async () => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      console.log('🔍 DEBUG - No sessionId, skipping loadDocuments');
+      return;
+    }
+
+    console.log('🔍 DEBUG - Loading documents for session:', sessionId);
 
     try {
       const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
       const data = await response.json();
+      console.log('🔍 DEBUG - API response:', data);
+      console.log('🔍 DEBUG - Documents loaded:', data.documents);
       setDocuments(data.documents || []);
     } catch (error) {
       console.error('Error loading documents:', error);
     }
   };
+
 
   // Handle document removal
   const handleRemoveDocument = async (documentId: string) => {
@@ -184,6 +202,11 @@ const Home = () => {
       // Mark that chat has started
       if (!hasStartedChat) {
         setHasStartedChat(true);
+        // 🔧 FIX: Force reload documents when starting chat
+        setTimeout(() => {
+          console.log('🔍 DEBUG - Force loading documents on chat start');
+          loadDocuments();
+        }, 100);
       }
 
       // First add the user message to the chat
