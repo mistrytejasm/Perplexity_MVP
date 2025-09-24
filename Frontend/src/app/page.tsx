@@ -33,14 +33,14 @@ const Home = () => {
   const [currentMessage, setCurrentMessage] = useState("");
   const [checkpointId, setCheckpointId] = useState(null);
   const [hasStartedChat, setHasStartedChat] = useState(false);
-  const [sessionId, setSessionId] = useState(''); 
+  const [sessionId, setSessionId] = useState('');
   const [documents, setDocuments] = useState([]);
   const [showDocuments, setShowDocuments] = useState(false);
 
   // Load documents for current session
   const loadDocuments = async () => {
     if (!sessionId) return;
-    
+
     try {
       const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
       const data = await response.json();
@@ -146,7 +146,7 @@ const Home = () => {
           merged.urls.push(url);
         }
       });
-      
+
       // Also add to webSources for display
       urlsArray.forEach((url: string) => {
         const domain = url.split('//')[1]?.split('/')[0] || 'unknown';
@@ -163,7 +163,7 @@ const Home = () => {
           merged.sources.push(source);
         }
       });
-      
+
       // Also add to documentSources for display
       newData.sources.forEach((source: string) => {
         if (!merged.documentSources.find(ds => ds.filename === source)) {
@@ -185,7 +185,7 @@ const Home = () => {
       if (!hasStartedChat) {
         setHasStartedChat(true);
       }
-      
+
       // First add the user message to the chat
       const newMessageId = messages.length > 0 ? Math.max(...messages.map(msg => msg.id)) + 1 : 1;
       setMessages(prev => [
@@ -243,19 +243,19 @@ const Home = () => {
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
-                    ? { 
-                        ...msg, 
-                        searchInfo: {
-                          stages: ['searching'],
-                          query: data.query,
-                          source: 'controlled',
-                          subQueries: [],
-                          urls: [],
-                          sources: [],
-                          webSources: [],
-                          documentSources: []
-                        }
+                    ? {
+                      ...msg,
+                      searchInfo: {
+                        stages: ['searching'],
+                        query: data.query,
+                        source: 'controlled',
+                        subQueries: [],
+                        urls: [],
+                        sources: [],
+                        webSources: [],
+                        documentSources: []
                       }
+                    }
                     : msg
                 )
               );
@@ -264,17 +264,17 @@ const Home = () => {
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
-                    ? { 
-                        ...msg, 
-                        searchInfo: {
-                          ...msg.searchInfo,
-                          stages: ['searching'],
-                          query: data.query_type === 'original' ? data.query : msg.searchInfo?.query,
-                          subQueries: data.query_type === 'sub_query' 
-                            ? [...(msg.searchInfo?.subQueries || []), data.query]
-                            : (msg.searchInfo?.subQueries || [])
-                        }
+                    ? {
+                      ...msg,
+                      searchInfo: {
+                        ...msg.searchInfo,
+                        stages: ['searching'],
+                        query: data.query_type === 'original' ? data.query : msg.searchInfo?.query,
+                        subQueries: data.query_type === 'sub_query'
+                          ? [...(msg.searchInfo?.subQueries || []), data.query]
+                          : (msg.searchInfo?.subQueries || [])
                       }
+                    }
                     : msg
                 )
               );
@@ -283,13 +283,13 @@ const Home = () => {
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
-                    ? { 
-                        ...msg, 
-                        searchInfo: {
-                          ...msg.searchInfo,
-                          stages: [...(msg.searchInfo?.stages || []), 'reading']
-                        }
+                    ? {
+                      ...msg,
+                      searchInfo: {
+                        ...msg.searchInfo,
+                        stages: [...(msg.searchInfo?.stages || []), 'reading']
                       }
+                    }
                     : msg
                 )
               );
@@ -298,18 +298,18 @@ const Home = () => {
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
-                    ? { 
-                        ...msg, 
-                        searchInfo: {
-                          ...msg.searchInfo,
-                          webSources: [
-                            ...(msg.searchInfo?.webSources || []), 
-                            data.source
-                          ].filter((source, index, arr) => 
-                            arr.findIndex(s => s.url === source.url) === index
-                          )
-                        }
+                    ? {
+                      ...msg,
+                      searchInfo: {
+                        ...msg.searchInfo,
+                        webSources: [
+                          ...(msg.searchInfo?.webSources || []),
+                          data.source
+                        ].filter((source, index, arr) =>
+                          arr.findIndex(s => s.url === source.url) === index
+                        )
                       }
+                    }
                     : msg
                 )
               );
@@ -318,13 +318,13 @@ const Home = () => {
               setMessages(prev =>
                 prev.map(msg =>
                   msg.id === aiResponseId
-                    ? { 
-                        ...msg, 
-                        searchInfo: {
-                          ...msg.searchInfo,
-                          stages: [...(msg.searchInfo?.stages || []), 'writing']
-                        }
+                    ? {
+                      ...msg,
+                      searchInfo: {
+                        ...msg.searchInfo,
+                        stages: [...(msg.searchInfo?.stages || []), 'writing']
                       }
+                    }
                     : msg
                 )
               );
@@ -362,15 +362,15 @@ const Home = () => {
             setMessages(prev =>
               prev.map(msg =>
                 msg.id === aiResponseId
-                  ? { 
-                      ...msg, 
-                      content: "Sorry, there was an error processing your request.", 
-                      isLoading: false,
-                      searchInfo: mergeSearchInfo(msg.searchInfo, {
-                        type: 'search_error',
-                        error: "Connection error"
-                      })
-                    }
+                  ? {
+                    ...msg,
+                    content: "Sorry, there was an error processing your request.",
+                    isLoading: false,
+                    searchInfo: mergeSearchInfo(msg.searchInfo, {
+                      type: 'search_error',
+                      error: "Connection error"
+                    })
+                  }
                   : msg
               )
             );
@@ -417,10 +417,10 @@ const Home = () => {
         </div>
 
         {/* Search Input */}
-        <div className="w-full max-w-lg mx-8"> 
-          <InputBar 
-            currentMessage={currentMessage} 
-            setCurrentMessage={setCurrentMessage} 
+        <div className="w-full max-w-lg mx-8">
+          <InputBar
+            currentMessage={currentMessage}
+            setCurrentMessage={setCurrentMessage}
             onSubmit={handleSubmit}
             centered={true}
             sessionId={sessionId}
@@ -431,51 +431,61 @@ const Home = () => {
     );
   }
 
-  // CHAT SCREEN: With document list in header when needed
   return (
     <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
-      {/* Header with document toggle (only show if documents exist) */}
+
+      {/* Document Header - ONLY show when documents exist */}
       {documents.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b p-4">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            <h1 className="text-lg font-semibold">AI Search Engine</h1>
+        <div className="fixed top-0 left-0 right-0 z-20 bg-white border-b shadow-sm">
+          <div className="flex items-center justify-between max-w-4xl mx-auto px-4 py-3">
+            <h1 className="text-lg font-semibold text-gray-800">AI Search Engine</h1>
+
             <button
               onClick={() => setShowDocuments(!showDocuments)}
-              className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+              className="flex items-center space-x-2 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-full border border-blue-200 transition-colors"
             >
-              <span>📎 Documents ({documents.length})</span>
+              <span>📎</span>
+              <span className="font-medium text-blue-700">
+                {documents.length} document{documents.length > 1 ? 's' : ''}
+              </span>
+              <span className="text-blue-500 text-xs">
+                {showDocuments ? '▼' : '▲'}
+              </span>
             </button>
           </div>
-          
+
+          {/* Document list - shows when expanded */}
           {showDocuments && (
-            <div className="max-w-4xl mx-auto mt-4 bg-gray-50 rounded-lg p-4">
-              <DocumentList 
-                documents={documents}
-                onRemoveDocument={handleRemoveDocument}
-              />
+            <div className="border-t bg-gray-50">
+              <div className="max-w-4xl mx-auto px-4 py-4">
+                <DocumentList
+                  documents={documents}
+                  onRemoveDocument={handleRemoveDocument}
+                />
+              </div>
             </div>
           )}
         </div>
       )}
-      
-      {/* Message Area */}
-      <div className={`flex-1 overflow-y-auto pb-24 ${documents.length > 0 ? 'pt-20' : 'pt-4'}`}>
+
+      {/* Message Area - adjust padding based on header */}
+      <div className={`flex-1 overflow-y-auto pb-24 ${documents.length > 0 ? 'pt-20' : 'pt-0'}`}>
         <MessageArea messages={messages} />
       </div>
-      
+
       {/* Input Bar - Fixed at bottom */}
       <div className="fixed bottom-0 left-0 right-0 z-10">
-        <InputBar 
-          currentMessage={currentMessage} 
-          setCurrentMessage={setCurrentMessage} 
-          onSubmit={handleSubmit} 
+        <InputBar
+          currentMessage={currentMessage}
+          setCurrentMessage={setCurrentMessage}
+          onSubmit={handleSubmit}
           centered={false}
           sessionId={sessionId}
-          onUploadComplete={loadDocuments} // Pass this so InputBar can refresh documents
+          onUploadComplete={loadDocuments} // Make sure you pass this
         />
       </div>
     </div>
   );
-};
+}
 
-export default Home;
+  export default Home;
