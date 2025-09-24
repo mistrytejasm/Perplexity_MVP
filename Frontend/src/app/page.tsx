@@ -47,6 +47,17 @@ const Home = () => {
     });
   }, [documents, sessionId, hasStartedChat]);
 
+  // In your useEffect where you initialize session:
+  useEffect(() => {
+    // 🔥 ALWAYS create a new session to avoid document mixing
+    const newSession = generateSessionId();
+    setSessionId(newSession);
+    localStorage.setItem('perplexity_session_id', newSession);
+    
+    console.log('🔍 DEBUG - Created new session:', newSession);
+  }, []);
+
+
   // MISSING FROM YOUR CODE - This is critical!
   const loadDocuments = async () => {
     if (!sessionId) return;
