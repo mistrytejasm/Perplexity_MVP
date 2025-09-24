@@ -55,17 +55,34 @@ const Home = () => {
     }
 
     console.log('🔍 DEBUG - Loading documents for session:', sessionId);
+    console.log('🔍 DEBUG - API URL will be:', `https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
 
     try {
       const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
+      console.log('🔍 DEBUG - Response status:', response.status);
+      console.log('🔍 DEBUG - Response ok:', response.ok);
+      
       const data = await response.json();
-      console.log('🔍 DEBUG - API response:', data);
-      console.log('🔍 DEBUG - Documents loaded:', data.documents);
+      console.log('🔍 DEBUG - Raw API response:', data);
+      console.log('🔍 DEBUG - data.documents:', data.documents);
+      console.log('🔍 DEBUG - data.documents type:', typeof data.documents);
+      console.log('🔍 DEBUG - data.documents length:', data.documents?.length);
+      console.log('🔍 DEBUG - Is array?', Array.isArray(data.documents));
+      
+      // 🔧 FIX: Add more detailed inspection
+      if (data.documents && Array.isArray(data.documents)) {
+        console.log('🔍 DEBUG - Documents array content:', data.documents);
+        data.documents.forEach((doc, index) => {
+          console.log(`🔍 DEBUG - Document ${index}:`, doc);
+        });
+      }
+      
       setDocuments(data.documents || []);
     } catch (error) {
       console.error('Error loading documents:', error);
     }
   };
+
 
 
   // Handle document removal
