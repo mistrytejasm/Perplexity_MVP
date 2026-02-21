@@ -1,13 +1,20 @@
 @import "tailwindcss";
 
+/* Hide Next.js dev error indicator (the red "1 Issue" badge) */
+nextjs-portal {
+  display: none !important;
+}
+
 
 /* 🔥 UNIVERSAL INPUT TEXT  */
-input, textarea {
+input,
+textarea {
   color: #000000 !important;
   caret-color: #000000 !important;
 }
 
-input::placeholder, textarea::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: #6b7280 !important;
 }
 
@@ -20,13 +27,16 @@ input::placeholder, textarea::placeholder {
 
 /* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  input, textarea {
+
+  input,
+  textarea {
     color: #ffffff !important;
     background-color: #1f1f1f !important;
     caret-color: #ffffff !important;
   }
-  
-  input::placeholder, textarea::placeholder {
+
+  input::placeholder,
+  textarea::placeholder {
     color: #9ca3af !important;
   }
 }
@@ -61,7 +71,9 @@ body {
   line-height: 1.6;
 }
 
-.prose h1, .prose h2, .prose h3 {
+.prose h1,
+.prose h2,
+.prose h3 {
   color: #1f2937;
   font-weight: 600;
 }
@@ -88,7 +100,8 @@ body {
   font-weight: 600;
 }
 
-.prose table td, .prose table th {
+.prose table td,
+.prose table th {
   border: 1px solid #e5e7eb;
   padding: 0.75rem;
 }
@@ -103,11 +116,13 @@ body {
     width: 95%;
   }
 }
+
 @keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(-10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -119,6 +134,7 @@ body {
     opacity: 0;
     transform: translateX(-20px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -132,6 +148,7 @@ body {
 .animate-slideIn {
   animation: slideIn 0.3s ease-out forwards;
 }
+
 /* Code block enhancements */
 .group:hover .group-hover\:opacity-100 {
   opacity: 1;
@@ -158,39 +175,180 @@ pre::-webkit-scrollbar-thumb:hover {
 
 /* Copy button animation */
 @keyframes copySuccess {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 .copy-success {
   animation: copySuccess 0.3s ease-in-out;
 }
+
 /* ADD THESE CSS RULES */
 .scroll-smooth {
-    scroll-behavior: smooth;
+  scroll-behavior: smooth;
 }
 
 /* Ensure smooth scrolling works globally */
 html {
-    scroll-behavior: smooth;
+  scroll-behavior: smooth;
 }
 
 /* Custom scrollbar styling (optional) */
 .overflow-y-auto::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
+  background: #f1f1f1;
+  border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
+  background: #c1c1c1;
+  border-radius: 3px;
 }
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+  background: #a8a8a8;
+}
+
+/* =============================================
+   Improvement #5: Input Focus Ring Glow
+   ============================================= */
+@keyframes inputGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
+}
+
+.input-focus-glow:focus-within {
+  animation: inputGlow 2s ease-in-out infinite;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  transition: border-color 0.2s ease;
+}
+
+/* =============================================
+   Improvement #6: Shimmer Skeleton Animation
+   ============================================= */
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 37%, #f0f0f0 63%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* =============================================
+   Improvement #7: Three-dot typing indicator
+   ============================================= */
+@keyframes bounceDot {
+
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+
+  40% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.typing-dot:nth-child(1) {
+  animation: bounceDot 1.2s ease-in-out infinite 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation: bounceDot 1.2s ease-in-out infinite 0.18s;
+}
+
+.typing-dot:nth-child(3) {
+  animation: bounceDot 1.2s ease-in-out infinite 0.36s;
+}
+
+/* =============================================
+   Improvement #14: Message slide-up on enter
+   ============================================= */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* =============================================
+   Improvement #15: Dark mode CSS vars
+   ============================================= */
+[data-theme="dark"] {
+  --bg-primary: #0f0f10;
+  --bg-secondary: #1a1a1b;
+  --bg-sidebar: #16161a;
+  --text-primary: #e8e8ea;
+  --text-secondary: #9b9ba4;
+  --border-color: #2a2a30;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] .bg-white {
+  background-color: var(--bg-primary) !important;
+}
+
+[data-theme="dark"] .bg-gray-50 {
+  background-color: var(--bg-secondary) !important;
+}
+
+[data-theme="dark"] .text-gray-900 {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .text-gray-700 {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .border-gray-200 {
+  border-color: var(--border-color) !important;
+}
+
+/* Scrollbar hide utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

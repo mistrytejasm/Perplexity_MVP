@@ -101,15 +101,15 @@ const InputBar: React.FC<InputBarProps> = ({
   // Container styles based on mode
   const containerClasses = centered
     ? "w-full"
-    : "bg-[#FCFCF8] border-t border-gray-200 backdrop-blur-sm bg-opacity-95 shadow-lg";
+    : "w-full pb-6 sm:pb-8 z-50 relative pointer-events-none flex justify-center";
 
   const innerContainerClasses = centered
     ? "w-full"
-    : "max-w-3xl mx-auto px-4 py-4";
+    : "max-w-3xl w-full px-4 sm:px-6 pointer-events-auto";
 
   const inputClasses = centered
     ? "w-full px-6 py-4 text-sm"
-    : "px-4 py-3";
+    : "w-full px-5 py-3.5 text-[15px]";
 
   // 🔧 FIXED: Calculate total document count properly
   const totalDocumentCount = (documents?.length || 0) + uploadedDocs.filter(doc => doc.status === 'ready').length;
@@ -182,7 +182,7 @@ const InputBar: React.FC<InputBarProps> = ({
         )}
 
         {/* Input Container */}
-        <div className="relative">
+        <div className="relative input-focus-glow rounded-2xl border border-gray-300 bg-white transition-all">
           {/* Form */}
           <form onSubmit={onSubmit}>
             <TextareaAutosize
@@ -192,16 +192,14 @@ const InputBar: React.FC<InputBarProps> = ({
               placeholder={centered ? "Ask anything..." : "Ask anything..."}
               minRows={1}
               maxRows={centered ? 8 : 5}
-              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:border-transparent shadow-sm`}
+              className={`w-full ${inputClasses} pb-14 bg-transparent border-0 rounded-2xl resize-none focus:outline-none text-gray-900 transition-all ${centered ? 'shadow-xl' : 'shadow-[0_0_40px_rgba(0,0,0,0.05)]'}`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   onSubmit(e);
                 }
               }}
-              style={{
-                lineHeight: '1.5'
-              }}
+              style={{ lineHeight: '1.5' }}
             />
           </form>
 
@@ -237,10 +235,10 @@ const InputBar: React.FC<InputBarProps> = ({
               type="button"
               onClick={handleSendClick}
               disabled={!currentMessage.trim()}
-              className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5E507F] to-[#4A3F71] text-white hover:from-[#524670] hover:to-[#3E3566] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
+              className="w-8 h-8 rounded-full bg-gray-900 text-white hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
               title="Send message"
             >
-              <Send className="w-3 h-3" />
+              <Send className="w-3.5 h-3.5" />
             </button>
           </div>
 
