@@ -2,7 +2,8 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, FileText, CheckCircle2, CircleDashed, Loader2, Sparkles } from 'lucide-react';
+import { Globe, FileText, CheckCircle2, CircleDashed, Loader2, Sparkles, Plus, Copy, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react';
+import SourceCard from './SourceCard';
 
 
 const PremiumTypingAnimation = () => {
@@ -108,35 +109,15 @@ const SearchStages = ({ searchInfo, onSourceClick }: { searchInfo: any, onSource
 
                         {/* Sources Grid (Perplexity Style Cards) */}
                         {allSources.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-2 pb-2 mt-1">
+                            <div className="flex overflow-x-auto gap-3 pb-3 mt-2 scrollbar-hide -mx-1 px-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                                 {allSources.map((source: any, index: number) => (
-                                    <motion.div
-                                        onClick={() => onSourceClick && onSourceClick(source, allSources)}
-                                        rel="noopener noreferrer"
-                                        initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        transition={{ delay: index * 0.05 }}
+                                    <SourceCard
                                         key={`source-${index}`}
-                                        className="flex-shrink-0 w-40 bg-white border border-gray-200 rounded-lg p-2.5 shadow-sm hover:shadow-md hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer group no-underline block"
-                                    >
-                                        <div className="flex items-center space-x-1.5 mb-1.5">
-                                            <div className="w-4 h-4 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center flex-shrink-0">
-                                                {source.type === 'web' ? <Globe className="w-2.5 h-2.5" /> : <FileText className="w-2.5 h-2.5" />}
-                                            </div>
-                                            <span className="text-[11px] text-gray-500 truncate font-semibold w-full">
-                                                {source.domain || (source.url && source.url.startsWith('http') ? new URL(source.url).hostname.replace('www.', '') : 'Website')}
-                                            </span>
-                                        </div>
-                                        <div className="text-xs text-gray-800 font-medium line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors h-8">
-                                            {source.title || source.filename || "Source Document"}
-                                        </div>
-                                        {/* Citation Number Badge */}
-                                        <div className="mt-1 flex items-center">
-                                            <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] text-[10px] bg-gray-100 text-gray-500 rounded-full font-bold">
-                                                {index + 1}
-                                            </span>
-                                        </div>
-                                    </motion.div>
+                                        source={source}
+                                        index={index}
+                                        allSources={allSources}
+                                        onClick={onSourceClick}
+                                    />
                                 ))}
                             </div>
                         )}
@@ -503,8 +484,9 @@ interface Message {
 interface MessageAreaProps {
     messages: Message[];
     onSourceClick?: (source: any, allSources: any[]) => void;
+    onSuggestionClick?: (query: string) => void;
 }
-const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) => {
+const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick, onSuggestionClick }) => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -563,7 +545,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) =>
         >
             <div className="max-w-[768px] mx-auto w-full">
                 <AnimatePresence initial={false}>
-                    {messages.map((message) => (
+                    {messages.map((message, index) => (
                         <motion.div
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -578,16 +560,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) =>
                                     </div>
                                 </div>
                             ) : (
-                                /* AI MESSAGE - Document flow */
                                 <div className="flex w-full group">
-                                    {/* Left Icon - FIXED POSITION FOR ALL AI CONTENT */}
-                                    <div className="flex-shrink-0 mr-4 mt-1">
-                                        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity shadow-sm">
-                                            <Sparkles className="w-4 h-4 text-indigo-500" />
-                                        </div>
-                                    </div>
-
-                                    {/* Right Content Column */}
                                     <div className="flex-1 min-w-0 flex flex-col pt-1">
 
                                         {/* Sources Row */}
@@ -595,17 +568,84 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) =>
                                             <SearchStages searchInfo={message.searchInfo} onSourceClick={onSourceClick} />
                                         )}
 
+                                        {/* Answer Header */}
+                                        {(message.content || (message.isLoading && !message.searchInfo?.stages?.includes('searching'))) && (
+                                            <div className="flex items-center space-x-2 mt-4 mb-2">
+                                                <svg className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                                                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                </svg>
+                                                <h3 className="text-lg font-semibold text-gray-900 tracking-tight font-sans">Answer</h3>
+                                            </div>
+                                        )}
+
                                         {/* Answer Content */}
-                                        {message.isLoading && !message.content && !message.searchInfo?.stages?.includes('searching') ? (
+                                        {message.searchInfo?.stages?.includes('error') ? (
+                                            <div className="bg-red-50 text-red-700 p-4 rounded-xl border border-red-100 flex items-start space-x-3 mb-2">
+                                                <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="font-semibold text-[13px] tracking-tight text-red-900">Failed to generate answer</p>
+                                                    <p className="text-[12px] text-red-600/90 mt-1 leading-relaxed">
+                                                        {message.searchInfo.error || message.content || "A connection error occurred while communicating with the AI. Please try again."}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : message.isLoading && !message.content && !message.searchInfo?.stages?.includes('searching') ? (
                                             <PremiumTypingAnimation />
                                         ) : message.content ? (
                                             <div className="prose prose-sm md:prose-base max-w-none prose-p:leading-relaxed prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-headings:font-bold prose-headings:text-gray-900 prose-a:text-blue-600 text-gray-800 break-words w-full">
                                                 {parseMarkdown(message.content, message.searchInfo, onSourceClick)}
                                                 {message.isLoading && (
-                                                    <span className="inline-block w-2.5 h-4 ml-1 mb-0.5 align-middle bg-indigo-400 animate-pulse rounded-sm"></span>
+                                                    <span className="inline-block w-2.5 h-4 ml-1 mb-[2px] align-middle bg-indigo-500 animate-[pulse_0.75s_cubic-bezier(0.4,0,0.6,1)_infinite] rounded-sm shadow-sm"></span>
                                                 )}
                                             </div>
                                         ) : null}
+
+                                        {/* Action Bar (Copy / Feedback) */}
+                                        {!message.isLoading && message.content && (
+                                            <div className="mt-2.5 flex items-center space-x-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => navigator.clipboard.writeText(message.content)}
+                                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                                                    title="Copy text"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </button>
+                                                <button className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors">
+                                                    <ThumbsUp className="w-4 h-4" />
+                                                </button>
+                                                <button className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                                                    <ThumbsDown className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {/* Follow-up Suggestions at bottom of last response */}
+                                        {!message.isLoading && message.content && index === messages.length - 1 && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.3 }}
+                                                className="mt-6 flex flex-col space-y-2 border-t border-gray-100 pt-4"
+                                            >
+                                                <div className="flex items-center text-sm font-medium text-gray-500 mb-1">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Related
+                                                </div>
+                                                {/* Use subQueries from backend if available, fallback to hardcoded ideas */}
+                                                {(message.searchInfo?.subQueries?.length ? message.searchInfo.subQueries.slice(0, 3) : ["Tell me more about this", "What are the alternatives?", "How does this work technically?"]).map((q: string, idx: number) => (
+                                                    <button
+                                                        key={`followup-${idx}`}
+                                                        onClick={() => onSuggestionClick && onSuggestionClick(q)}
+                                                        className="text-left px-4 py-2.5 bg-gray-50/80 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 rounded-xl text-[13px] font-medium text-gray-700 transition-colors flex items-center justify-between group"
+                                                    >
+                                                        <span>{q}</span>
+                                                        <Plus className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                                                    </button>
+                                                ))}
+                                            </motion.div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -618,23 +658,25 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) =>
                 <div ref={messagesEndRef} />
             </div>
             {/* ADD SCROLL TO BOTTOM BUTTON */}
-            {showScrollButton && (
-                <button
-                    onClick={scrollToBottomInstant}
-                    className="fixed bottom-24 right-8 w-12 h-12 bg-white border border-gray-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-20 hover:bg-gray-50"
-                    title="Scroll to bottom"
-                >
-                    <svg
-                        className="w-5 h-5 text-gray-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+            {
+                showScrollButton && (
+                    <button
+                        onClick={scrollToBottomInstant}
+                        className="fixed bottom-24 right-8 w-12 h-12 bg-white border border-gray-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-20 hover:bg-gray-50"
+                        title="Scroll to bottom"
                     >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                </button>
-            )}
-        </div>
+                        <svg
+                            className="w-5 h-5 text-gray-600"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                    </button>
+                )
+            }
+        </div >
     );
 };
 
