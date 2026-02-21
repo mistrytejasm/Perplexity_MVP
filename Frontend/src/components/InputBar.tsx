@@ -101,15 +101,15 @@ const InputBar: React.FC<InputBarProps> = ({
   // Container styles based on mode
   const containerClasses = centered
     ? "w-full"
-    : "bg-[#FCFCF8] border-t border-gray-200 backdrop-blur-sm bg-opacity-95 shadow-lg";
+    : "bg-white border-t border-gray-200 pb-4 z-50";
 
   const innerContainerClasses = centered
     ? "w-full"
-    : "max-w-3xl mx-auto px-4 py-4";
+    : "max-w-3xl mx-auto px-4 pt-4";
 
   const inputClasses = centered
     ? "w-full px-6 py-4 text-sm"
-    : "px-4 py-3";
+    : "px-4 py-3 text-sm";
 
   // 🔧 FIXED: Calculate total document count properly
   const totalDocumentCount = (documents?.length || 0) + uploadedDocs.filter(doc => doc.status === 'ready').length;
@@ -192,7 +192,7 @@ const InputBar: React.FC<InputBarProps> = ({
               placeholder={centered ? "Ask anything..." : "Ask anything..."}
               minRows={1}
               maxRows={centered ? 8 : 5}
-              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-[#5E507F] focus:border-transparent shadow-sm`}
+              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent ${centered ? 'shadow-xl' : 'shadow-sm'} text-gray-900 transition-all`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -237,10 +237,10 @@ const InputBar: React.FC<InputBarProps> = ({
               type="button"
               onClick={handleSendClick}
               disabled={!currentMessage.trim()}
-              className="w-8 h-8 rounded-full bg-gradient-to-r from-[#5E507F] to-[#4A3F71] text-white hover:from-[#524670] hover:to-[#3E3566] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
+              className="w-8 h-8 rounded-full bg-gray-900 text-white hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
               title="Send message"
             >
-              <Send className="w-3 h-3" />
+              <Send className="w-3.5 h-3.5" />
             </button>
           </div>
 

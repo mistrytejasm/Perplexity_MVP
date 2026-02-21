@@ -1,131 +1,153 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import CitationRenderer from './CitationRenderer';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Globe, FileText, CheckCircle2, CircleDashed, Loader2, Sparkles } from 'lucide-react';
 
 
 const PremiumTypingAnimation = () => {
     return (
-        <div className="flex items-center">
-            <div className="flex items-center space-x-1.5">
-                <div className="w-1.5 h-1.5 bg-gray-400/70 rounded-full animate-pulse"
-                    style={{ animationDuration: "1s", animationDelay: "0ms" }}></div>
-                <div className="w-1.5 h-1.5 bg-gray-400/70 rounded-full animate-pulse"
-                    style={{ animationDuration: "1s", animationDelay: "300ms" }}></div>
-                <div className="w-1.5 h-1.5 bg-gray-400/70 rounded-full animate-pulse"
-                    style={{ animationDuration: "1s", animationDelay: "600ms" }}></div>
-            </div>
+        <div className="flex items-center space-x-2 text-gray-400 py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm font-medium">Thinking...</span>
         </div>
     );
 };
-const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
+
+// Premium Perplexity-style Sources Display
+const SearchStages = ({ searchInfo, onSourceClick }: { searchInfo: any, onSourceClick?: (source: any) => void }) => {
+    const [isExpanded, setIsExpanded] = useState(true);
+
     if (!searchInfo || !searchInfo.stages || searchInfo.stages.length === 0) return null;
+
+    // Combine web and document sources
+    const allSources = [
+        ...(searchInfo.webSources || []).map((s: any, idx: number) => ({ ...s, type: 'web', index: idx + 1 })),
+        ...(searchInfo.documentSources || []).map((s: any, idx: number) => ({ ...s, type: 'doc', index: (searchInfo.webSources?.length || 0) + idx + 1 }))
+    ];
+
+    const isSearching = searchInfo.stages.includes('searching') && !searchInfo.stages.includes('writing');
+
+    // Auto-collapse after search finishes
+    useEffect(() => {
+        if (!isSearching) {
+            const timer = setTimeout(() => setIsExpanded(false), 500); // Faster collapse to match Perplexity
+            return () => clearTimeout(timer);
+        } else {
+            setIsExpanded(true);
+        }
+    }, [isSearching]);
+
     return (
-        <div className="mb-3 mt-1 relative pl-4">
-            <div className="flex flex-col space-y-4 text-sm text-gray-700">
-                {searchInfo.stages.includes('searching') && (
-                    <div className="relative">
-                        <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-teal-400 rounded-full z-10 shadow-sm"></div>
-                        {searchInfo.stages.includes('reading') && (
-                            <div className="absolute -left-[7px] top-3 w-0.5 h-[calc(100%+1rem)] bg-gradient-to-b from-teal-300 to-teal-200"></div>
+        <div className="mb-4 mt-0 w-full">
+            {/* Status Header (Clickable to toggle) */}
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center space-x-2 text-sm text-gray-500 mb-2 font-medium hover:text-gray-800 transition-colors focus:outline-none"
+            >
+                {isSearching ? (
+                    <div className="flex items-center space-x-2 text-blue-600">
+                        <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                        <span>Searching {searchInfo.source === 'documents' ? 'documents' : searchInfo.source === 'hybrid' ? 'knowledge base' : 'web'}...</span>
+                    </div>
+                ) : (
+                    <div className="flex items-center text-gray-700 hover:text-gray-900 transition-colors bg-gray-50/80 px-2 py-1.5 rounded-md">
+                        <CheckCircle2 className="w-4 h-4 text-gray-400 mr-2" />
+                        <span className="font-semibold text-sm mr-2">Sources</span>
+                        {allSources.length > 0 && (
+                            <span className="text-xs text-gray-500 bg-gray-200/60 border border-gray-200/80 px-1.5 py-0.5 rounded-full">{allSources.length}</span>
                         )}
-                        <div className="flex flex-col">
-                            <span className="font-medium mb-2 ml-2">
-                                {searchInfo.source === 'documents' ? 'Searching documents' :
-                                    searchInfo.source === 'web' ? 'Searching the web' : 'Searching the web'}
-                            </span>
+                    </div>
+                )}
+            </button>
 
-                            {/* Show ALL Queries - Original + Sub-queries */}
-                            <div className="flex flex-wrap gap-2 pl-2 mt-1">
-                                {/* Original Query */}
-                                {searchInfo.query && (
-                                    <div className="bg-blue-100 text-xs px-3 py-1.5 rounded border border-blue-200 inline-flex items-center">
-                                        <svg className="w-3 h-3 mr-1.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                        </svg>
-                                        <span className="font-semibold text-blue-700">Original:</span>
-                                        <span className="ml-1 text-blue-600">{searchInfo.query}</span>
-                                    </div>
-                                )}
-
-                                {/* ALL Sub-Queries */}
-                                {searchInfo.subQueries && searchInfo.subQueries.length > 0 && (
-                                    searchInfo.subQueries.map((subQuery: string, index: number) => (
-                                        <div key={index} className="bg-gray-100 text-xs px-3 py-1.5 rounded border border-gray-200 inline-flex items-center">
-                                            <span className="text-gray-500 font-medium mr-1">{index + 2}.</span>
-                                            <span className="text-gray-600">{subQuery}</span>
-                                        </div>
-                                    ))
+            {/* Collapsible Content */}
+            <AnimatePresence>
+                {isExpanded && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                    >
+                        {/* Status Steps when Searching */}
+                        {isSearching && (
+                            <div className="mb-4 pl-1 space-y-2 flex flex-col border-l-2 border-gray-100 ml-1.5 py-1">
+                                <motion.div
+                                    initial={{ opacity: 0, x: -5 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    className="flex items-center text-sm text-gray-500 pl-4"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5 mr-2 text-indigo-400" />
+                                    <span>Understanding query...</span>
+                                </motion.div>
+                                {searchInfo.subQueries && searchInfo.subQueries.map((sq: string, idx: number) => (
+                                    <motion.div
+                                        key={`sq-${idx}`}
+                                        initial={{ opacity: 0, x: -5 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: idx * 0.1 }}
+                                        className="flex items-center text-sm text-gray-700 pl-4 font-medium"
+                                    >
+                                        <Globe className="w-3.5 h-3.5 mr-2 text-blue-400" />
+                                        <span>Searching: {sq}</span>
+                                    </motion.div>
+                                ))}
+                                {searchInfo.stages.includes('reading') && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: -5 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="flex items-center text-sm text-gray-500 pl-4"
+                                    >
+                                        <FileText className="w-3.5 h-3.5 mr-2 text-teal-500" />
+                                        <span>Reading {Math.max(1, allSources.length)} sources...</span>
+                                    </motion.div>
                                 )}
                             </div>
-                        </div>
-                    </div>
-                )}
-                {searchInfo.stages.includes('reading') && (
-                    <div className="relative">
-                        <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-teal-400 rounded-full z-10 shadow-sm"></div>
-                        <div className="flex flex-col">
-                            <span className="font-medium mb-2 ml-2">Reading sources</span>
+                        )}
 
-                            {/* Show ALL Web Sources */}
-                            {searchInfo.webSources && searchInfo.webSources.length > 0 && (
-                                <div className="pl-2 space-y-1 mb-2">
-                                    <div className="flex flex-wrap gap-2">
-                                        {searchInfo.webSources.map((source: any, index: number) => (
-                                            <div key={`web-${index}-${source.url}`} className="bg-blue-50 text-xs px-3 py-1.5 rounded border border-blue-200 truncate max-w-[200px] transition-all duration-200 hover:bg-blue-100">
-                                                <span className="text-blue-600 font-medium">
-                                                    🌐 {source.domain || (source.url ? new URL(source.url).hostname.replace('www.', '') : 'Unknown')}
-                                                </span>
+                        {/* Sources Grid (Perplexity Style Cards) */}
+                        {allSources.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2 pb-2 mt-1">
+                                {allSources.map((source: any, index: number) => (
+                                    <motion.div
+                                        onClick={() => onSourceClick && onSourceClick(source)}
+                                        rel="noopener noreferrer"
+                                        initial={{ opacity: 0, scale: 0.95, y: 5 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        transition={{ delay: index * 0.05 }}
+                                        key={`source-${index}`}
+                                        className="flex-shrink-0 w-40 bg-white border border-gray-200 rounded-lg p-2.5 shadow-sm hover:shadow-md hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer group no-underline block"
+                                    >
+                                        <div className="flex items-center space-x-1.5 mb-1.5">
+                                            <div className="w-4 h-4 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center flex-shrink-0">
+                                                {source.type === 'web' ? <Globe className="w-2.5 h-2.5" /> : <FileText className="w-2.5 h-2.5" />}
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Show ALL Document Sources */}
-                            {searchInfo.documentSources && searchInfo.documentSources.length > 0 && (
-                                <div className="pl-2 space-y-1">
-                                    <div className="flex flex-wrap gap-2">
-                                        {searchInfo.documentSources.map((source: any, index: number) => (
-                                            <div key={`doc-${index}-${source.filename}`} className="bg-purple-50 text-xs px-3 py-1.5 rounded border border-purple-200 truncate max-w-[200px] transition-all duration-200 hover:bg-purple-100">
-                                                <span className="text-purple-600 font-medium">
-                                                    📄 {source.filename}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {/* Show count if many sources */}
-                            {((searchInfo.webSources?.length || 0) + (searchInfo.documentSources?.length || 0)) > 8 && (
-                                <div className="pl-2 mt-2 text-xs text-gray-500">
-                                    Total: {(searchInfo.webSources?.length || 0) + (searchInfo.documentSources?.length || 0)} sources
-                                </div>
-                            )}
-                        </div>
-                    </div>
+                                            <span className="text-[11px] text-gray-500 truncate font-semibold w-full">
+                                                {source.domain || (source.url && source.url.startsWith('http') ? new URL(source.url).hostname.replace('www.', '') : 'Website')}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-gray-800 font-medium line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors h-8">
+                                            {source.title || source.filename || "Source Document"}
+                                        </div>
+                                        {/* Citation Number Badge */}
+                                        <div className="mt-1 flex items-center">
+                                            <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] text-[10px] bg-gray-100 text-gray-500 rounded-full font-bold">
+                                                {index + 1}
+                                            </span>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
+                    </motion.div>
                 )}
-                {searchInfo.stages.includes('writing') && (
-                    <div className="relative">
-                        <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-teal-400 rounded-full z-10 shadow-sm"></div>
-                        <span className="font-medium pl-2">Writing answer</span>
-                    </div>
-                )}
-                {searchInfo.stages.includes('error') && (
-                    <div className="relative">
-                        <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-red-400 rounded-full z-10 shadow-sm"></div>
-                        <span className="font-medium pl-2 text-red-600">Search error</span>
-                        <div className="pl-4 text-xs text-red-500 mt-1">
-                            {searchInfo.error || "An error occurred during search."}
-                        </div>
-                    </div>
-                )}
-            </div>
+            </AnimatePresence>
         </div>
     );
 };
 // Enhanced markdown parser with FIXED syntax
-const parseMarkdown = (content: string) => {
+const parseMarkdown = (content: string, searchInfo?: any, onSourceClick?: (source: any) => void) => {
     if (!content) return content;
 
     // Clean up the content first
@@ -136,7 +158,7 @@ const parseMarkdown = (content: string) => {
         .trim();
 
     const lines = cleanContent.split('\n');
-    const parsed: JSX.Element[] = [];
+    const parsed: React.ReactNode[] = [];
     let listItems: string[] = [];
     let inList = false;
     let tableRows: string[][] = [];
@@ -166,24 +188,24 @@ const parseMarkdown = (content: string) => {
     const flushTable = () => {
         if (tableRows.length > 0) {
             parsed.push(
-                <div key={`table-${parsed.length}`} className="overflow-x-auto mb-6 rounded-lg border border-gray-200">
-                    <table className="min-w-full">
+                <div key={`table-${parsed.length}`} className="overflow-x-auto w-full mb-6 mt-4">
+                    <table className="w-full text-left border-collapse rounded-xl overflow-hidden ring-1 ring-gray-200">
                         {tableHeaders.length > 0 && (
-                            <thead className="bg-gray-50">
+                            <thead className="bg-gray-50/80">
                                 <tr>
                                     {tableHeaders.map((header, idx) => (
-                                        <th key={idx} className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-b border-gray-200">
+                                        <th key={idx} className="px-4 py-3 text-sm font-semibold text-gray-700 border-b border-gray-200">
                                             {formatInlineMarkdown(header.trim())}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
                         )}
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white">
                             {tableRows.map((row, rowIdx) => (
-                                <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <tr key={rowIdx} className="hover:bg-gray-50/50 transition-colors border-b border-gray-100 last:border-0">
                                     {row.map((cell, cellIdx) => (
-                                        <td key={cellIdx} className="px-6 py-4 text-sm text-gray-700">
+                                        <td key={cellIdx} className="px-4 py-3 text-sm text-gray-700 align-top">
                                             {formatInlineMarkdown(cell.trim())}
                                         </td>
                                     ))}
@@ -246,48 +268,17 @@ const parseMarkdown = (content: string) => {
         inCodeBlock = false;
     };
 
-    const formatInlineMarkdown = (text: string): JSX.Element => {
+    const formatInlineMarkdown = (text: string): React.ReactNode => {
         if (!text) return <span></span>;
 
-        // First, handle simple citations [1]
-        const elements: (string | JSX.Element)[] = [];
-        const citationRegex = /\[(\d+|Source\s*\d+|Web\s*\d+|Document\s*\d+)\]/gi;
-        let lastIndex = 0;
-        let match;
+        // Combine web and document sources to resolve citations to URLs
+        const allSources = searchInfo ? [
+            ...(searchInfo.webSources || []).map((s: any) => ({ ...s, type: 'web' })),
+            ...(searchInfo.documentSources || []).map((s: any) => ({ ...s, type: 'doc' }))
+        ] : [];
 
-        while ((match = citationRegex.exec(text)) !== null) {
-            if (match.index > lastIndex) {
-                elements.push(text.substring(lastIndex, match.index));
-            }
-            const citationText = match[1];
-
-            // Extract just the number if it's "Source 1" or "Web 2"
-            const numberMatch = citationText.match(/\d+/);
-            const citationNumber = numberMatch ? numberMatch[0] : citationText;
-
-            elements.push(
-                <span
-                    key={`citation-${match.index}`}
-                    className="inline-flex items-center justify-center min-w-[24px] px-1 h-6 text-xs bg-blue-100 text-blue-700 rounded border border-blue-300 hover:bg-blue-200 transition-colors duration-150 mx-1 cursor-pointer font-medium"
-                    title={`Citation: ${citationText}`}
-                >
-                    {citationNumber}
-                </span>
-            );
-            lastIndex = citationRegex.lastIndex;
-        }
-
-        if (lastIndex < text.length) {
-            elements.push(text.substring(lastIndex));
-        }
-
-        // Process each element for inline formatting
-        const processInlineFormatting = (textChunk: string, keyPrefix: number): (string | JSX.Element)[] => {
-            if (!textChunk || typeof textChunk !== 'string') return [textChunk];
-
-            const results: (string | JSX.Element)[] = [];
-
-            // Combined regex for bold, italic, and inline code
+        const processStyleFormatting = (textChunk: string, keyPrefix: string): (string | React.ReactNode)[] => {
+            const results: (string | React.ReactNode)[] = [];
             const inlineRegex = /(\*\*[^*]+\*\*)|(\*[^*]+\*)|(`[^`]+`)/g;
             let lastIdx = 0;
             let inlineMatch;
@@ -332,17 +323,71 @@ const parseMarkdown = (content: string) => {
             return results;
         };
 
-        // Apply inline formatting to all text elements
-        const finalElements: (string | JSX.Element)[] = [];
-        elements.forEach((element, idx) => {
-            if (typeof element === 'string') {
-                finalElements.push(...processInlineFormatting(element, idx));
-            } else {
-                finalElements.push(element);
-            }
-        });
+        // Process each element for inline formatting
+        const processInlineFormatting = (textChunk: string, keyPrefix: number): (string | React.ReactNode)[] => {
+            if (!textChunk || typeof textChunk !== 'string') return [textChunk];
 
-        return <span>{finalElements}</span>;
+            const results: (string | React.ReactNode)[] = [];
+
+            // Pattern for Citations: [1], [2], etc
+            const citationRegex = /\[(\d+|Source\s*\d+|Web\s*\d+|Document\s*\d+)\]/gi;
+
+            let lastIndex = 0;
+            let match;
+
+            while ((match = citationRegex.exec(textChunk)) !== null) {
+                // Add text before match
+                if (match.index > lastIndex) {
+                    const preText = textChunk.substring(lastIndex, match.index);
+                    // recursively format bold/italic for this text
+                    results.push(...processStyleFormatting(preText, `${keyPrefix}-${lastIndex}`));
+                }
+
+                const citationText = match[1];
+                const numberMatch = citationText.match(/\d+/);
+                const citationNumber = numberMatch ? parseInt(numberMatch[0], 10) : null;
+
+                let sourceUrl = undefined;
+                let actualSource = null;
+                if (citationNumber && citationNumber > 0 && citationNumber <= allSources.length) {
+                    actualSource = allSources[citationNumber - 1];
+                    sourceUrl = actualSource?.url;
+                }
+
+                if (actualSource) {
+                    results.push(
+                        <button
+                            key={`citation-${keyPrefix}-${match.index}`}
+                            onClick={() => onSourceClick && onSourceClick(actualSource)}
+                            className="inline-flex items-center justify-center min-w-[20px] px-[5px] h-[18px] text-[10px] bg-blue-50 text-blue-600 rounded-full ring-1 ring-blue-200/60 hover:bg-blue-100 hover:text-blue-800 transition-colors mx-0.5 cursor-pointer font-semibold relative -top-0.5 no-underline"
+                            title={`Source ${citationNumber}`}
+                        >
+                            {citationNumber}
+                        </button>
+                    );
+                } else {
+                    results.push(
+                        <span
+                            key={`citation-${keyPrefix}-${match.index}`}
+                            className="inline-flex items-center justify-center min-w-[20px] px-[5px] h-[18px] text-[10px] bg-gray-100/80 text-gray-600 rounded-full ring-1 ring-gray-200/60 hover:bg-gray-200 hover:text-gray-900 transition-colors mx-0.5 cursor-pointer font-semibold relative -top-0.5"
+                            title={`Source ${citationNumber}`}
+                        >
+                            {citationNumber}
+                        </span>
+                    );
+                }
+
+                lastIndex = citationRegex.lastIndex;
+            }
+
+            if (lastIndex < textChunk.length) {
+                results.push(...processStyleFormatting(textChunk.substring(lastIndex), `${keyPrefix}-${lastIndex}`));
+            }
+
+            return results;
+        };
+
+        return <span>{processInlineFormatting(text, 0)}</span>;
     };
 
 
@@ -444,7 +489,7 @@ const parseMarkdown = (content: string) => {
     flushTable();
     flushCodeBlock();
 
-    return <div className="space-y-1 group">{parsed}</div>;
+    return <div className="space-y-1.5 text-gray-800 break-words">{parsed}</div>;
 };
 
 interface Message {
@@ -457,8 +502,9 @@ interface Message {
 }
 interface MessageAreaProps {
     messages: Message[];
+    onSourceClick?: (source: any) => void;
 }
-const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
+const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -513,40 +559,59 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
         <div
             ref={containerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto bg-[#FCFCF8] px-4 py-6 relative"
+            className="flex-1 overflow-y-auto bg-white px-4 py-8 relative scroll-smooth"
         >
-            {/* Center the conversation with max width like Perplexity */}
-            <div className="max-w-3xl mx-auto">
-                {messages.map((message) => (
-                    <div key={message.id} className={`flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-6`}>
-                        <div className={`flex flex-col ${message.isUser ? 'max-w-md' : 'max-w-full w-full'}`}>
-                            {/* Search Status Display */}
-                            {!message.isUser && message.searchInfo && (
-                                <SearchStages searchInfo={message.searchInfo} />
-                            )}
-
-                            {/* Message Content */}
-                            <div
-                                className={`rounded-lg py-3 px-4 ${message.isUser
-                                    ? 'bg-gradient-to-br from-[#5E507F] to-[#4A3F71] text-white rounded-br-none shadow-md'
-                                    : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm'
-                                    }`}
-                            >
-                                {message.isLoading ? (
-                                    <PremiumTypingAnimation />
-                                ) : (
-                                    <div className="max-w-none">
-                                        {message.isUser ? (
-                                            <p className="mb-0 text-white text-sm">{message.content}</p>
-                                        ) : (
-                                            parseMarkdown(message.content || "Waiting for response...")
-                                        )}
+            <div className="max-w-[768px] mx-auto w-full">
+                <AnimatePresence initial={false}>
+                    {messages.map((message) => (
+                        <motion.div
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            key={`msg-${message.id}`}
+                            className="mb-8"
+                        >
+                            {/* USER MESSAGE - Big bold text */}
+                            {message.isUser ? (
+                                <div className="flex justify-end w-full mb-8">
+                                    <div className="max-w-[85%] bg-gray-100/60 border border-gray-100 px-5 py-4 rounded-3xl rounded-br-md shadow-sm">
+                                        <p className="text-gray-900 text-[16px] font-medium leading-relaxed whitespace-pre-wrap">{message.content}</p>
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                ))}
+                                </div>
+                            ) : (
+                                /* AI MESSAGE - Document flow */
+                                <div className="flex w-full group">
+                                    {/* Left Icon - FIXED POSITION FOR ALL AI CONTENT */}
+                                    <div className="flex-shrink-0 mr-4 mt-1">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity shadow-sm">
+                                            <Sparkles className="w-4 h-4 text-indigo-500" />
+                                        </div>
+                                    </div>
+
+                                    {/* Right Content Column */}
+                                    <div className="flex-1 min-w-0 flex flex-col pt-1">
+
+                                        {/* Sources Row */}
+                                        {message.searchInfo && message.searchInfo.stages.length > 0 && (
+                                            <SearchStages searchInfo={message.searchInfo} onSourceClick={onSourceClick} />
+                                        )}
+
+                                        {/* Answer Content */}
+                                        {message.isLoading && !message.content && !message.searchInfo?.stages?.includes('searching') ? (
+                                            <PremiumTypingAnimation />
+                                        ) : message.content ? (
+                                            <div className="prose prose-sm md:prose-base max-w-none prose-p:leading-relaxed prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-headings:font-bold prose-headings:text-gray-900 prose-a:text-blue-600 text-gray-800 break-words w-full">
+                                                {parseMarkdown(message.content, message.searchInfo, onSourceClick)}
+                                                {message.isLoading && (
+                                                    <span className="inline-block w-2.5 h-4 ml-1 mb-0.5 align-middle bg-indigo-400 animate-pulse rounded-sm"></span>
+                                                )}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
 
                 {/* Extra bottom spacing so last message isn't hidden behind fixed input */}
                 <div className="h-6"></div>

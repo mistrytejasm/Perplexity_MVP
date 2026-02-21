@@ -3,6 +3,8 @@ import InputBar from '@/components/InputBar';
 import MessageArea from '@/components/MessageArea';
 import React, { useState, useEffect } from 'react';
 import DocumentList from '@/components/document/DocumentList';
+import { FileText, Globe } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Simple session ID generator
 const generateSessionId = () => 'session_' + Date.now();
@@ -36,6 +38,7 @@ const Home = () => {
   const [sessionId, setSessionId] = useState('');
   const [documents, setDocuments] = useState([]); // ← MISSING IN YOUR CODE
   const [showDocuments, setShowDocuments] = useState(false); // ← MISSING IN YOUR CODE
+  const [selectedSource, setSelectedSource] = useState<any | null>(null);
 
   // Add this useEffect to debug document state changes
   useEffect(() => {
@@ -188,7 +191,7 @@ const Home = () => {
     return merged;
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (currentMessage.trim()) {
       // Mark that chat has started
@@ -284,9 +287,9 @@ const Home = () => {
                     ? {
                       ...msg,
                       searchInfo: {
-                        ...msg.searchInfo,
+                        ...msg.searchInfo!,
                         stages: ['searching'],
-                        query: data.query_type === 'original' ? data.query : msg.searchInfo?.query,
+                        query: data.query_type === 'original' ? data.query : msg.searchInfo?.query || "",
                         subQueries: data.query_type === 'sub_query'
                           ? [...(msg.searchInfo?.subQueries || []), data.query]
                           : (msg.searchInfo?.subQueries || [])
@@ -303,7 +306,7 @@ const Home = () => {
                     ? {
                       ...msg,
                       searchInfo: {
-                        ...msg.searchInfo,
+                        ...msg.searchInfo!,
                         stages: [...(msg.searchInfo?.stages || []), 'reading']
                       }
                     }
@@ -318,7 +321,7 @@ const Home = () => {
                     ? {
                       ...msg,
                       searchInfo: {
-                        ...msg.searchInfo,
+                        ...msg.searchInfo!,
                         webSources: [
                           ...(msg.searchInfo?.webSources || []),
                           data.source
@@ -338,7 +341,7 @@ const Home = () => {
                     ? {
                       ...msg,
                       searchInfo: {
-                        ...msg.searchInfo,
+                        ...msg.searchInfo!,
                         stages: [...(msg.searchInfo?.stages || []), 'writing']
                       }
                     }
@@ -424,7 +427,7 @@ const Home = () => {
   // PRE-CHAT SCREEN: Clean and simple
   if (!hasStartedChat) {
     return (
-      <div className="min-h-screen bg-[#FCFCF8] flex flex-col items-center justify-center px-6 -mt-16">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 -mt-16">
         {/* Logo/Title */}
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-semibold text-gray-800 mb-1">
@@ -458,16 +461,16 @@ const Home = () => {
   });
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
+    <div className="flex flex-col min-h-screen bg-white relative">
       {/* Remove the header completely - we'll show docs above input instead */}
 
-      {/* Message Area - No top padding since no header */}
-      <div className="flex-1 overflow-y-auto pb-24">
-        <MessageArea messages={messages} />
+      {/* Message Area - No top padding since no header, add right padding if source is open */}
+      <div className={`flex-1 overflow-y-auto pb-24 transition-all duration-300 ${selectedSource ? 'pr-80' : ''}`}>
+        <MessageArea messages={messages} onSourceClick={setSelectedSource} />
       </div>
 
       {/* Input Bar - Fixed at bottom WITH document display above */}
-      <div className="fixed bottom-0 left-0 right-0 z-10">
+      <div className={`fixed bottom-0 left-0 right-0 z-10 transition-all duration-300 ${selectedSource ? 'pr-80' : ''}`}>
         <InputBar
           currentMessage={currentMessage}
           setCurrentMessage={setCurrentMessage}
@@ -475,10 +478,75 @@ const Home = () => {
           centered={false}
           sessionId={sessionId}
           onUploadComplete={loadDocuments}
-          documents={documents} // 🔥 NEW: Pass documents to InputBar
-          showDocumentsAboveInput={true} // 🔥 NEW: Flag to show docs above input
+          documents={documents}
+          showDocumentsAboveInput={true}
         />
       </div>
+
+      {/* Right Sidebar for Source Details */}
+      <AnimatePresence>
+        {selectedSource && (
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 bottom-0 w-80 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col"
+          >
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+              <h2 className="text-sm font-semibold text-gray-800 flex items-center">
+                <FileText className="w-4 h-4 mr-2 text-indigo-500" /> Source Details
+              </h2>
+              <button
+                onClick={() => setSelectedSource(null)}
+                className="p-1.5 rounded-md hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+
+            {/* Sidebar Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="mb-4">
+                <span className="inline-flex items-center justify-center min-w-[24px] h-[24px] text-xs bg-indigo-50 text-indigo-700 rounded-full font-bold mb-3 ring-1 ring-indigo-200/50">
+                  {selectedSource.index}
+                </span>
+                <h3 className="text-lg font-bold text-gray-900 leading-snug mb-2">
+                  {selectedSource.title || selectedSource.filename || "Source Document"}
+                </h3>
+                <div className="flex items-center text-sm text-gray-500 mb-6">
+                  {selectedSource.type === 'web' ? <Globe className="w-3.5 h-3.5 mr-1.5" /> : <FileText className="w-3.5 h-3.5 mr-1.5" />}
+                  <span className="truncate">{selectedSource.domain || (selectedSource.url ? new URL(selectedSource.url).hostname.replace('www.', '') : 'Website')}</span>
+                </div>
+              </div>
+
+              {selectedSource.url && selectedSource.url.startsWith('http') && (
+                <a
+                  href={selectedSource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex justify-center items-center w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm mb-6"
+                >
+                  Visit Source <svg className="w-3.5 h-3.5 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                </a>
+              )}
+
+              <div className="border-t border-gray-100 pt-5">
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Metadata</h4>
+                <div className="space-y-3 text-sm">
+                  {selectedSource.type && (
+                    <div><span className="text-gray-500 block mb-0.5">Type</span><span className="text-gray-800 font-medium capitalize">{selectedSource.type} Source</span></div>
+                  )}
+                  {selectedSource.score && (
+                    <div><span className="text-gray-500 block mb-0.5">Relevance Score</span><span className="text-gray-800 font-medium">{(selectedSource.score * 100).toFixed(1)}%</span></div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 
