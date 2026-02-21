@@ -177,135 +177,200 @@ async def chat_stream(message: str, checkpoint_id: str = None, session_id: str =
             yield f"data: {json.dumps({'type': 'writing_start'})}\n\n"
             await asyncio.sleep(0.3)
             
+            # ── Citation normalizer ─────────────────────────────────────────────
+            # Buffers the streaming output and converts any non-standard citation
+            # formats (e.g. OpenAI file-search 〆15†L1-L3〇) to clean [N] brackets.
+            import re as _re
+            _CITATION_RE = _re.compile(
+                r'》|《|'  # left/right corners
+                r'【(\d+)(?:†[^\u3011]*)?】|'  # 【N†...】
+                r'《(\d+)(?:†[^\u300b]*)?》|'  # 《N†...》 variant
+                r'\\u3010(\d+)[^\\u3011]*\\u3011'  # escaped variant
+            )
+
+            async def normalized_stream(raw_stream):
+                """Yield clean tokens with 【N†...】→[N] substitution."""
+                buf = ""
+                async for chunk in raw_stream:
+                    token = chunk.choices[0].delta.content or ""
+                    if not token:
+                        continue
+                    buf += token
+                    # Only flush when we're not mid-citation bracket
+                    while buf:
+                        # Check if buf might be the start of a citation bracket
+                        # Flush safe prefix before any potential citation
+                        safe_end = len(buf)
+                        for marker in ['【', '《', '\\u3010']:
+                            idx = buf.find(marker)
+                            if idx != -1:
+                                safe_end = min(safe_end, idx)
+                        if safe_end > 0:
+                            clean = buf[:safe_end]
+                            buf = buf[safe_end:]
+                            yield clean
+                        elif len(buf) > 40:
+                            # Safety: if buffer grows without a bracket close, flush it
+                            yield buf
+                            buf = ""
+                        else:
+                            break
+                # Flush remainder
+                if buf:
+                    yield buf
+
+            def clean_citation(text: str) -> str:
+                """Replace any variant citation format with [N]."""
+                # 【N†L1-L3】 or 【N】
+                text = _re.sub(r'【(\d+)(?:†[^】]*)?】', r'[\1]', text)
+                # 《N†...》
+                text = _re.sub(r'《(\d+)(?:†[^》]*)?》', r'[\1]', text)
+                # Unicode escapes \u3010...\u3011
+                text = _re.sub(r'\\u3010(\d+)[^\\u3011]*\\u3011', r'[\1]', text)
+                # Stray L1-L5 like artifacts after bracket removal
+                text = _re.sub(r'†L\d+-L\d+', '', text)
+                return text
+
+            # Model to use for all generation paths
+            GENERATION_MODEL = "llama-3.3-70b-versatile"
+
             try:
                 if search_source == 'documents':
-                    # 🔥 FIXED: Generate document response inline
                     doc_context = ""
                     for i, result in enumerate(doc_results, 1):
-                        doc_context += f"\n[Source {i} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
-                        doc_context += f"{result['content']}\n"
-                    
-                    document_prompt = f"""Answer the user's question using ONLY the provided document content.
-DOCUMENT EXCERPTS:
-{doc_context}
+                        doc_context += (
+                            f"[{i}] {result['metadata']['filename']} "
+                            f"(page {result['metadata']['page_number']}):\n"
+                            f"{result['content'][:600]}\n\n"
+                        )
 
-USER QUESTION: {message}
-
-INSTRUCTIONS:
-1. Provide a comprehensive and accurate answer.
-2. You MUST cite your sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source number.
-3. Place the citation immediately after the fact it supports, like this: "The company revenue grew by 20% [1]."
-4. Never make claims without citing the exact Source.
-5. If the document does not contain the answer, simply say "The provided documents do not contain information to answer this question." Do not hallucinate.
-6. DO NOT add a "References" or "Sources" section at the end. Your only citations must be inline bracketed numbers.
-
-STRICT Citation Rules (CRITICAL):
-- You MUST cite EVERY source provided above if you use its information. Do not leave sources uncited.
-- Cite sources immediately after relevant statements.
-- DO NOT use markdown links for citations. Just use the raw bracket: [1]
-- Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2].\""""
-                    
-                    response = await groq_service.client.chat.completions.create(
-                        model="openai/gpt-oss-120b",
+                    doc_prompt = (
+                        f"Answer the question using ONLY the numbered document excerpts below.\n\n"
+                        f"{doc_context}\n"
+                        f"QUESTION: {message}\n\n"
+                        f"RULES:\n"
+                        f"- After every fact write its source number in square brackets: [1], [2], etc.\n"
+                        f"- Multiple sources: [1][2]\n"
+                        f"- Use ONLY plain square brackets. NEVER use 【】 or any other bracket style.\n"
+                        f"- Use ## headings, **bold**, - bullets.\n"
+                        f"- NO References section at the end."
+                    )
+                    stream = await groq_service.client.chat.completions.create(
+                        model=GENERATION_MODEL,
                         messages=[
-                            {"role": "system", "content": "You are a precise document analysis assistant. Always cite sources."},
-                            {"role": "user", "content": document_prompt}
+                            {"role": "system", "content": (
+                                "You are a precise document analyst. "
+                                "Cite every fact with [N] immediately after it. "
+                                "Use ONLY square bracket citations like [1] or [1][2]. "
+                                "Never use any other citation format."
+                            )},
+                            {"role": "user", "content": doc_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=1500
+                        max_tokens=1500,
+                        stream=True
                     )
-                    
-                    if response.choices and response.choices[0].message.content:
-                        response_text = response.choices[0].message.content
-                        sentences = response_text.split('. ')
-                        for i, sentence in enumerate(sentences):
-                            if sentence.strip():
-                                chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
-                                yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
-                                await asyncio.sleep(0.1)
-                
+                    async for clean_token in normalized_stream(stream):
+                        clean_token = clean_citation(clean_token)
+                        if clean_token:
+                            yield f"data: {json.dumps({'type': 'content', 'content': clean_token})}\n\n"
+
                 elif search_source == 'web':
-                    # 🔥 FIXED: Generate web response inline
-                    from services.content_synthesizer import ContentSynthesizer
-                    synthesizer = ContentSynthesizer()
-                    
-                    synthesized = await synthesizer.synthesize_response(
-                        query=message,
-                        analysis=analysis,
-                        web_results=web_results
-                    )
-                    
-                    sentences = synthesized.response.split('. ')
-                    for i, sentence in enumerate(sentences):
-                        if sentence.strip():
-                            chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
-                            yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
-                            await asyncio.sleep(0.1)
-                
-                else:  # hybrid
-                    # 🔥 FIXED: Generate hybrid response inline
                     web_context = ""
-                    current_idx = 1
                     if web_results and web_results.results:
-                        for result in web_results.results[:3]:
-                            web_context += f"\n[Source {current_idx} - {result.url}]:\n"
-                            web_context += f"{result.content}\n"
-                            current_idx += 1
-                            
-                    doc_context = ""
+                        for i, result in enumerate(web_results.results[:6], 1):
+                            web_context += (
+                                f"[{i}] {result.title}\n"
+                                f"URL: {result.url}\n"
+                                f"{result.content[:700]}\n\n"
+                            )
+
+                    web_prompt = (
+                        f"Answer the question using the numbered web sources below.\n\n"
+                        f"{web_context}\n"
+                        f"QUESTION: {message}\n\n"
+                        f"RULES:\n"
+                        f"- After every fact write its source number: [1], [2], etc.\n"
+                        f"- Example: \"India plays Netherlands on 18 Feb [1].\"\n"
+                        f"- Multiple sources example: \"The tournament runs Feb-Mar [1][3].\"\n"
+                        f"- Use ONLY plain square bracket citations. NEVER use 【】 or other formats.\n"
+                        f"- Use ## headings, **bold** key terms, - bullet points.\n"
+                        f"- NO References or Sources section at the end."
+                    )
+                    stream = await groq_service.client.chat.completions.create(
+                        model=GENERATION_MODEL,
+                        messages=[
+                            {"role": "system", "content": (
+                                "You are a research assistant. "
+                                "After every factual claim, place the source number in square brackets: [1], [2], [1][3]. "
+                                "Use ONLY this exact format. Never use 【 】 《 》 or backslash-u formats. "
+                                "These are the ONLY valid citations: [1] [2] [3] [4] [5] [6]"
+                            )},
+                            {"role": "user", "content": web_prompt}
+                        ],
+                        temperature=0.1,
+                        max_tokens=2000,
+                        stream=True
+                    )
+                    async for clean_token in normalized_stream(stream):
+                        clean_token = clean_citation(clean_token)
+                        if clean_token:
+                            yield f"data: {json.dumps({'type': 'content', 'content': clean_token})}\n\n"
+
+                else:  # hybrid
+                    ctx_idx = 1
+                    hybrid_context = ""
                     if doc_results:
                         for result in doc_results:
-                            doc_context += f"\n[Source {current_idx} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
-                            doc_context += f"{result['content']}\n"
-                            current_idx += 1
-                    
-                    hybrid_prompt = f"""Answer the user's question using BOTH document excerpts AND web sources provided below.
-IMPORTANT: Combine information from both sources to give a comprehensive answer.
+                            hybrid_context += (
+                                f"[{ctx_idx}] DOC: {result['metadata']['filename']} pg "
+                                f"{result['metadata']['page_number']}:\n"
+                                f"{result['content'][:500]}\n\n"
+                            )
+                            ctx_idx += 1
+                    if web_results and web_results.results:
+                        for result in web_results.results[:4]:
+                            hybrid_context += (
+                                f"[{ctx_idx}] WEB: {result.title}\n"
+                                f"URL: {result.url}\n"
+                                f"{result.content[:500]}\n\n"
+                            )
+                            ctx_idx += 1
 
-DOCUMENT EXCERPTS:
-{doc_context}
-
-WEB SOURCES:
-{web_context}
-
-USER QUESTION: {message}
-
-INSTRUCTIONS:
-1. Provide a comprehensive and accurate answer.
-2. You MUST cite your sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source number.
-3. Place the citation immediately after the fact it supports, like this: "The company revenue grew by 20% [1] while their stock price doubled [2]."
-4. Never make claims without citing a source.
-5. If the sources conflict, explicitly mention the difference in information.
-6. DO NOT add a "References" or "Sources" section at the end. Your only citations must be inline bracketed numbers.
-
-STRICT Citation Rules:
-- You MUST cite EVERY source provided above if you use its information. Do not leave sources uncited.
-- Cite sources immediately after relevant statements.
-- Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2].\""""
-                    
-                    response = await groq_service.client.chat.completions.create(
-                        model="llama3-8b-8192",
+                    hybrid_prompt = (
+                        f"Answer using both document excerpts and web sources below.\n\n"
+                        f"{hybrid_context}\n"
+                        f"QUESTION: {message}\n\n"
+                        f"RULES:\n"
+                        f"- Cite every fact immediately with [N] after it.\n"
+                        f"- Use ONLY plain square bracket format: [1], [2], [1][2].\n"
+                        f"- NEVER use 【】 or other bracket styles.\n"
+                        f"- Use ## headings, **bold**, - bullets.\n"
+                        f"- NO References section at end."
+                    )
+                    stream = await groq_service.client.chat.completions.create(
+                        model=GENERATION_MODEL,
                         messages=[
-                            {"role": "system", "content": "You are an expert research assistant. Combine information from multiple sources effectively."},
+                            {"role": "system", "content": (
+                                "You are a research assistant for hybrid document+web search. "
+                                "Cite sources as [1] [2] immediately after facts. "
+                                "Use ONLY plain square brackets. Never use other citation formats."
+                            )},
                             {"role": "user", "content": hybrid_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=2000
+                        max_tokens=2000,
+                        stream=True
                     )
-                    
-                    if response.choices and response.choices[0].message.content:
-                        response_text = response.choices[0].message.content
-                        sentences = response_text.split('. ')
-                        for i, sentence in enumerate(sentences):
-                            if sentence.strip():
-                                chunk = sentence + ('. ' if i < len(sentences) - 1 else '')
-                                yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
-                                await asyncio.sleep(0.1)
-                        
+                    async for clean_token in normalized_stream(stream):
+                        clean_token = clean_citation(clean_token)
+                        if clean_token:
+                            yield f"data: {json.dumps({'type': 'content', 'content': clean_token})}\n\n"
+
             except Exception as e:
-                logger.error(f"❌ Response generation failed: {e}")
+                logger.error(f"\u274c Response generation failed: {e}")
                 yield f"data: {json.dumps({'type': 'content', 'content': f'Error generating response: {str(e)}'})}\n\n"
-            
+
             yield f"data: {json.dumps({'type': 'end'})}\n\n"
             
         except Exception as e:

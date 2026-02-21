@@ -182,7 +182,7 @@ const InputBar: React.FC<InputBarProps> = ({
         )}
 
         {/* Input Container */}
-        <div className="relative">
+        <div className="relative input-focus-glow rounded-2xl border border-gray-300 bg-white transition-all">
           {/* Form */}
           <form onSubmit={onSubmit}>
             <TextareaAutosize
@@ -192,16 +192,14 @@ const InputBar: React.FC<InputBarProps> = ({
               placeholder={centered ? "Ask anything..." : "Ask anything..."}
               minRows={1}
               maxRows={centered ? 8 : 5}
-              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent ${centered ? 'shadow-xl' : 'shadow-[0_0_40px_rgba(0,0,0,0.05)]'} text-gray-900 transition-all`}
+              className={`w-full ${inputClasses} pb-14 bg-transparent border-0 rounded-2xl resize-none focus:outline-none text-gray-900 transition-all ${centered ? 'shadow-xl' : 'shadow-[0_0_40px_rgba(0,0,0,0.05)]'}`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   onSubmit(e);
                 }
               }}
-              style={{
-                lineHeight: '1.5'
-              }}
+              style={{ lineHeight: '1.5' }}
             />
           </form>
 
