@@ -62,23 +62,20 @@ class ContentSynthesizer:
 
         processed = []
 
-        for i, result in enumerate(results[:8]):  # Limit to top 8 results
+        for i, result in enumerate(results[:6]):  # MUST match the 6 results streamed in main.py
             try:
                 # Clean and truncate content
                 content = self._clean_content(result.content)
-
-                if len(content) < 10:  # skip very short content
-                    continue
 
                 # Truncate if too long
                 if len(content) > self.max_content_length:
                     content = content[:self.max_content_length] + "..."
 
                 source = {
-                    "id": i + 1,
+                    "id": i + 1,  # Strictly align with frontend index (i)
                     "title": result.title,
                     "url": result.url,
-                    "content": content,
+                    "content": content if len(content) >= 10 else "Content unavailable or too short.",
                     "score": result.score
                 }
 
@@ -117,51 +114,44 @@ class ContentSynthesizer:
         # Build sources context
         sources_text = ""
         for source in sources:
-            sources_text += f"""
-                                Source [{source['id']}]: {source['title']}
-                                URL: {source['url']}
-                                Content: {source['content']}
-
-                                ---
-                                """
+            sources_text += f"Source [{source['id']}]: {source['title']}\nURL: {source['url']}\nContent: {source['content']}\n---\n"
             
-            prompt = f"""
-                    You are an expert research assistant. Your task is to synthesize information from multiple sources to answer the user's query comprehensively and accurately.
+        prompt = f"""
+You are an expert, highly analytical research assistant. Your task is to synthesize information from multiple sources to answer the user's query comprehensively and accurately.
 
-                    **User Query**: "{query}"
+**User Query**: "{query}"
 
-                    **Query Analysis**:
-                    - Type: {analysis.query_type}
-                    - Intent: {analysis.search_intent}
-                    - Complexity: {analysis.complexity_score}/10
+**Query Analysis**:
+- Type: {analysis.query_type}
+- Intent: {analysis.search_intent}
+- Complexity: {analysis.complexity_score}/10
 
-                    **Available Sources**:
-                    {sources_text}
+**Available Sources**:
+{sources_text}
 
-                    **Instructions**:
-                    1. **Synthesize** information from the sources to create a comprehensive answer
-                    2. **Use proper citations** - You MUST reference sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source ID.
-                    3. **Be accurate** - Only use information that's clearly supported by the sources. Do not hallucinate.
-                    4. **Structure well** - Use headers, bullet points, and clear organization
-                    5. **Be comprehensive** - Cover all relevant aspects of the query
-                    6. **Maintain objectivity** - Present balanced information when there are different viewpoints
+**Instructions**:
+1. **Synthesize** information from the sources to create a comprehensive, continuous answer.
+2. **Use proper citations** - You MUST reference sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source ID.
+3. **Be accurate** - Only use information that's clearly supported by the sources. Do not hallucinate.
+4. **Structure well** - Use headers, bullet points, and clear organization.
+5. **Be comprehensive** - Cover all relevant aspects of the query.
 
-                    **Response Format**:
-                    - Start with a clear, direct answer to the main question
-                    - Provide detailed explanation with proper citations
-                    - Use markdown formatting for better readability
-                    - Include relevant examples, comparisons, or additional context
-                    - End with a brief summary if the response is long
+**Response Format**:
+- Start with a clear, direct answer to the main question.
+- Provide detailed explanation with proper citations.
+- Use markdown formatting for better readability.
+- DO NOT add a "References" or "Sources" section at the end. Your only citations must be inline bracketed numbers.
 
-                    **Citation Rules**:
-                    - Cite sources immediately after relevant statements: "Quantum computers use qubits [1]."
-                    - DO NOT use markdown links for citations. Just use the raw bracket: [1]
-                    - Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2]."
-                    - Never make claims without citing sources
-                    - Ensure every major fact or claim has proper citation
+**STRICT Citation Rules (CRITICAL)**:
+- You MUST cite EVERY source provided in the "Available Sources" section if you use it. Do not leave sources uncited.
+- Cite sources immediately after relevant statements: "Quantum computers use qubits [1]."
+- DO NOT use markdown links for citations. Just use the raw bracket: [1]
+- Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2]."
+- Never make claims without citing sources.
+- Ensure every major fact or claim has at least one proper citation.
 
-                    Generate a comprehensive, well-cited response:
-                    """
+Generate a comprehensive, well-cited response now:
+"""
         
         return prompt
     

@@ -186,10 +186,17 @@ USER QUESTION: {message}
 
 INSTRUCTIONS:
 1. Provide a comprehensive and accurate answer.
-2. You MUST cite your sources using bracketed numbers, e.g., [1], [2], corresponding to the Document Source number.
-3. Place the citation immediately after the fact it supports, like this: "The sky is blue [1]."
-4. Never make claims without citing the exact Document Source.
-5. If the document does not contain the answer, simply say "The provided documents do not contain information to answer this question." Do not hallucinate."""
+2. You MUST cite your sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source number.
+3. Place the citation immediately after the fact it supports, like this: "The company revenue grew by 20% [1]."
+4. Never make claims without citing the exact Source.
+5. If the document does not contain the answer, simply say "The provided documents do not contain information to answer this question." Do not hallucinate.
+6. DO NOT add a "References" or "Sources" section at the end. Your only citations must be inline bracketed numbers.
+
+STRICT Citation Rules (CRITICAL):
+- You MUST cite EVERY source provided above if you use its information. Do not leave sources uncited.
+- Cite sources immediately after relevant statements.
+- DO NOT use markdown links for citations. Just use the raw bracket: [1]
+- Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2].\""""
                     
                     response = await groq_service.client.chat.completions.create(
                         model="openai/gpt-oss-120b",
@@ -230,17 +237,20 @@ INSTRUCTIONS:
                 
                 else:  # hybrid
                     # 🔥 FIXED: Generate hybrid response inline
+                    web_context = ""
+                    current_idx = 1
+                    if web_results and web_results.results:
+                        for result in web_results.results[:3]:
+                            web_context += f"\n[Source {current_idx} - {result.url}]:\n"
+                            web_context += f"{result.content}\n"
+                            current_idx += 1
+                            
                     doc_context = ""
                     if doc_results:
-                        for i, result in enumerate(doc_results, 1):
-                            doc_context += f"\n[Document Source {i} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
+                        for result in doc_results:
+                            doc_context += f"\n[Source {current_idx} - {result['metadata']['filename']}, Page {result['metadata']['page_number']}]:\n"
                             doc_context += f"{result['content']}\n"
-                    
-                    web_context = ""
-                    if web_results and web_results.results:
-                        for i, result in enumerate(web_results.results[:3], 1):
-                            web_context += f"\n[Web Source {i} - {result.url}]:\n"
-                            web_context += f"{result.content}\n"
+                            current_idx += 1
                     
                     hybrid_prompt = f"""Answer the user's question using BOTH document excerpts AND web sources provided below.
 IMPORTANT: Combine information from both sources to give a comprehensive answer.
@@ -255,10 +265,16 @@ USER QUESTION: {message}
 
 INSTRUCTIONS:
 1. Provide a comprehensive and accurate answer.
-2. You MUST cite your sources using bracketed numbers. For documents use [Document X], for web use [Web Y].
-3. Place the citation immediately after the fact it supports, like this: "The company revenue grew by 20% [Document 1] while their stock price doubled [Web 2]."
+2. You MUST cite your sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source number.
+3. Place the citation immediately after the fact it supports, like this: "The company revenue grew by 20% [1] while their stock price doubled [2]."
 4. Never make claims without citing a source.
-5. If the sources conflict, explicitly mention the difference in information."""
+5. If the sources conflict, explicitly mention the difference in information.
+6. DO NOT add a "References" or "Sources" section at the end. Your only citations must be inline bracketed numbers.
+
+STRICT Citation Rules:
+- You MUST cite EVERY source provided above if you use its information. Do not leave sources uncited.
+- Cite sources immediately after relevant statements.
+- Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2].\""""
                     
                     response = await groq_service.client.chat.completions.create(
                         model="llama3-8b-8192",

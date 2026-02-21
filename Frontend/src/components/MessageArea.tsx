@@ -15,7 +15,7 @@ const PremiumTypingAnimation = () => {
 };
 
 // Premium Perplexity-style Sources Display
-const SearchStages = ({ searchInfo, onSourceClick }: { searchInfo: any, onSourceClick?: (source: any) => void }) => {
+const SearchStages = ({ searchInfo, onSourceClick }: { searchInfo: any, onSourceClick?: (source: any, allSources: any[]) => void }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     if (!searchInfo || !searchInfo.stages || searchInfo.stages.length === 0) return null;
@@ -111,7 +111,7 @@ const SearchStages = ({ searchInfo, onSourceClick }: { searchInfo: any, onSource
                             <div className="flex flex-wrap gap-2 mb-2 pb-2 mt-1">
                                 {allSources.map((source: any, index: number) => (
                                     <motion.div
-                                        onClick={() => onSourceClick && onSourceClick(source)}
+                                        onClick={() => onSourceClick && onSourceClick(source, allSources)}
                                         rel="noopener noreferrer"
                                         initial={{ opacity: 0, scale: 0.95, y: 5 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -147,7 +147,7 @@ const SearchStages = ({ searchInfo, onSourceClick }: { searchInfo: any, onSource
     );
 };
 // Enhanced markdown parser with FIXED syntax
-const parseMarkdown = (content: string, searchInfo?: any, onSourceClick?: (source: any) => void) => {
+const parseMarkdown = (content: string, searchInfo?: any, onSourceClick?: (source: any, allSources: any[]) => void) => {
     if (!content) return content;
 
     // Clean up the content first
@@ -358,7 +358,7 @@ const parseMarkdown = (content: string, searchInfo?: any, onSourceClick?: (sourc
                     results.push(
                         <button
                             key={`citation-${keyPrefix}-${match.index}`}
-                            onClick={() => onSourceClick && onSourceClick(actualSource)}
+                            onClick={() => onSourceClick && onSourceClick(actualSource, allSources)}
                             className="inline-flex items-center justify-center min-w-[20px] px-[5px] h-[18px] text-[10px] bg-blue-50 text-blue-600 rounded-full ring-1 ring-blue-200/60 hover:bg-blue-100 hover:text-blue-800 transition-colors mx-0.5 cursor-pointer font-semibold relative -top-0.5 no-underline"
                             title={`Source ${citationNumber}`}
                         >
@@ -502,7 +502,7 @@ interface Message {
 }
 interface MessageAreaProps {
     messages: Message[];
-    onSourceClick?: (source: any) => void;
+    onSourceClick?: (source: any, allSources: any[]) => void;
 }
 const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick }) => {
 

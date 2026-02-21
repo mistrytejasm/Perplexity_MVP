@@ -38,7 +38,7 @@ const Home = () => {
   const [sessionId, setSessionId] = useState('');
   const [documents, setDocuments] = useState([]); // ← MISSING IN YOUR CODE
   const [showDocuments, setShowDocuments] = useState(false); // ← MISSING IN YOUR CODE
-  const [selectedSource, setSelectedSource] = useState<any | null>(null);
+  const [selectedSourceData, setSelectedSourceData] = useState<{ source?: any, allSources: any[] } | null>(null);
 
   // Add this useEffect to debug document state changes
   useEffect(() => {
@@ -465,12 +465,12 @@ const Home = () => {
       {/* Remove the header completely - we'll show docs above input instead */}
 
       {/* Message Area - No top padding since no header, add right padding if source is open */}
-      <div className={`flex-1 overflow-y-auto pb-24 transition-all duration-300 ${selectedSource ? 'pr-80' : ''}`}>
-        <MessageArea messages={messages} onSourceClick={setSelectedSource} />
+      <div className={`flex-1 overflow-y-auto pb-24 transition-all duration-300 ${selectedSourceData ? 'pr-80' : ''}`}>
+        <MessageArea messages={messages} onSourceClick={(source, allSources) => setSelectedSourceData({ source, allSources })} />
       </div>
 
       {/* Input Bar - Fixed at bottom WITH document display above */}
-      <div className={`fixed bottom-0 left-0 right-0 z-10 transition-all duration-300 ${selectedSource ? 'pr-80' : ''}`}>
+      <div className={`fixed bottom-0 left-0 right-0 z-10 transition-all duration-300 ${selectedSourceData ? 'pr-80' : ''}`}>
         <InputBar
           currentMessage={currentMessage}
           setCurrentMessage={setCurrentMessage}
@@ -485,7 +485,7 @@ const Home = () => {
 
       {/* Right Sidebar for Source Details */}
       <AnimatePresence>
-        {selectedSource && (
+        {selectedSourceData && (
           <motion.div
             initial={{ x: '100%', opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -494,55 +494,76 @@ const Home = () => {
             className="fixed top-0 right-0 bottom-0 w-80 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col"
           >
             {/* Sidebar Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80 shrink-0">
               <h2 className="text-sm font-semibold text-gray-800 flex items-center">
                 <FileText className="w-4 h-4 mr-2 text-indigo-500" /> Source Details
               </h2>
               <button
-                onClick={() => setSelectedSource(null)}
+                onClick={() => setSelectedSourceData(null)}
                 className="p-1.5 rounded-md hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
             </div>
 
-            {/* Sidebar Content */}
-            <div className="flex-1 overflow-y-auto p-5">
-              <div className="mb-4">
-                <span className="inline-flex items-center justify-center min-w-[24px] h-[24px] text-xs bg-indigo-50 text-indigo-700 rounded-full font-bold mb-3 ring-1 ring-indigo-200/50">
-                  {selectedSource.index}
-                </span>
-                <h3 className="text-lg font-bold text-gray-900 leading-snug mb-2">
-                  {selectedSource.title || selectedSource.filename || "Source Document"}
-                </h3>
-                <div className="flex items-center text-sm text-gray-500 mb-6">
-                  {selectedSource.type === 'web' ? <Globe className="w-3.5 h-3.5 mr-1.5" /> : <FileText className="w-3.5 h-3.5 mr-1.5" />}
-                  <span className="truncate">{selectedSource.domain || (selectedSource.url ? new URL(selectedSource.url).hostname.replace('www.', '') : 'Website')}</span>
-                </div>
-              </div>
+            {/* Sidebar Content List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {selectedSourceData.allSources.map((source: any, idx: number) => {
+                const isSelected = selectedSourceData.source?.index === source.index || selectedSourceData.source?.url === source.url;
 
-              {selectedSource.url && selectedSource.url.startsWith('http') && (
-                <a
-                  href={selectedSource.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex justify-center items-center w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm mb-6"
-                >
-                  Visit Source <svg className="w-3.5 h-3.5 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                </a>
-              )}
+                return (
+                  <div
+                    key={`sidebar-src-${idx}`}
+                    onClick={() => setSelectedSourceData({ source, allSources: selectedSourceData.allSources })}
+                    className={`p-3 rounded-lg border transition-all cursor-pointer group ${isSelected ? 'border-indigo-300 bg-indigo-50/50 shadow-sm' : 'border-gray-100 bg-gray-50/30 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <span className={`inline-flex items-center justify-center min-w-[20px] h-[20px] text-[10px] rounded-full font-bold transition-colors ${isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-200/80 text-gray-600 group-hover:bg-gray-300'
+                        }`}>
+                        {source.index || idx + 1}
+                      </span>
+                      <div className="flex items-center text-[10px] text-gray-500 bg-white px-1.5 py-0.5 rounded shadow-sm border border-gray-100 uppercase font-semibold tracking-wider">
+                        {source.type === 'web' ? <Globe className="w-3 h-3 mr-1 text-blue-400" /> : <FileText className="w-3 h-3 mr-1 text-teal-500" />}
+                        <span>{source.type}</span>
+                      </div>
+                    </div>
 
-              <div className="border-t border-gray-100 pt-5">
-                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Metadata</h4>
-                <div className="space-y-3 text-sm">
-                  {selectedSource.type && (
-                    <div><span className="text-gray-500 block mb-0.5">Type</span><span className="text-gray-800 font-medium capitalize">{selectedSource.type} Source</span></div>
-                  )}
-                  {selectedSource.score && (
-                    <div><span className="text-gray-500 block mb-0.5">Relevance Score</span><span className="text-gray-800 font-medium">{(selectedSource.score * 100).toFixed(1)}%</span></div>
-                  )}
-                </div>
-              </div>
+                    <h3 className={`text-[13px] font-bold leading-snug mb-1.5 ${isSelected ? 'text-indigo-950' : 'text-gray-800 group-hover:text-indigo-700 transition-colors'}`}>
+                      {source.title || source.filename || "Source Document"}
+                    </h3>
+
+                    <div className="text-[11px] text-gray-500 truncate mb-3 flex items-center">
+                      <svg className="w-3 h-3 mr-1 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                      {source.domain || (source.url && source.url.startsWith('http') ? new URL(source.url).hostname.replace('www.', '') : 'Website')}
+                    </div>
+
+                    {isSelected && source.url && source.url.startsWith('http') && (
+                      <motion.a
+                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                        animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex justify-center items-center w-full py-2 bg-gray-900 hover:bg-gray-800 text-white text-[11px] font-semibold rounded-md transition-colors shadow-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Visit Source <svg className="w-3 h-3 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                      </motion.a>
+                    )}
+
+                    {isSelected && source.score && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="mt-3 text-[10px] text-gray-400 font-medium"
+                      >
+                        Relevance match: {(source.score * 100).toFixed(1)}%
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}
