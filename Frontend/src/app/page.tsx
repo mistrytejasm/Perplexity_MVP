@@ -53,7 +53,7 @@ const Home = () => {
     const newSession = generateSessionId();
     setSessionId(newSession);
     localStorage.setItem('perplexity_session_id', newSession);
-    
+
     console.log('🔍 DEBUG - Created new session:', newSession);
   }, []);
 
@@ -61,9 +61,9 @@ const Home = () => {
   // MISSING FROM YOUR CODE - This is critical!
   const loadDocuments = async () => {
     if (!sessionId) return;
-    
+
     try {
-      const response = await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/session/${sessionId}`);
+      const response = await fetch(`http://localhost:8000/documents/session/${sessionId}`);
       const data = await response.json();
       setDocuments(data.documents || []);
     } catch (error) {
@@ -75,7 +75,7 @@ const Home = () => {
   // MISSING FROM YOUR CODE - This is critical!
   const handleRemoveDocument = async (documentId: string) => {
     try {
-      await fetch(`https://mistrytejasm-perplexity-mvp.hf.space/documents/${documentId}?session_id=${sessionId}`, {
+      await fetch(`http://localhost:8000/documents/${documentId}?session_id=${sessionId}`, {
         method: 'DELETE'
       });
       loadDocuments(); // Refresh document list
@@ -241,7 +241,7 @@ const Home = () => {
         ]);
 
         // HuggingFace backend URL
-        let url = `https://mistrytejasm-perplexity-mvp.hf.space/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
+        let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
         if (checkpointId) url += `&checkpoint_id=${encodeURIComponent(checkpointId)}`;
 
         const eventSource = new EventSource(url);
@@ -458,29 +458,29 @@ const Home = () => {
   });
 
   return (
-  <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
-    {/* Remove the header completely - we'll show docs above input instead */}
-    
-    {/* Message Area - No top padding since no header */}
-    <div className="flex-1 overflow-y-auto pb-24">
-      <MessageArea messages={messages} />
+    <div className="flex flex-col min-h-screen bg-[#FCFCF8] relative">
+      {/* Remove the header completely - we'll show docs above input instead */}
+
+      {/* Message Area - No top padding since no header */}
+      <div className="flex-1 overflow-y-auto pb-24">
+        <MessageArea messages={messages} />
+      </div>
+
+      {/* Input Bar - Fixed at bottom WITH document display above */}
+      <div className="fixed bottom-0 left-0 right-0 z-10">
+        <InputBar
+          currentMessage={currentMessage}
+          setCurrentMessage={setCurrentMessage}
+          onSubmit={handleSubmit}
+          centered={false}
+          sessionId={sessionId}
+          onUploadComplete={loadDocuments}
+          documents={documents} // 🔥 NEW: Pass documents to InputBar
+          showDocumentsAboveInput={true} // 🔥 NEW: Flag to show docs above input
+        />
+      </div>
     </div>
-    
-    {/* Input Bar - Fixed at bottom WITH document display above */}
-    <div className="fixed bottom-0 left-0 right-0 z-10">
-      <InputBar
-        currentMessage={currentMessage}
-        setCurrentMessage={setCurrentMessage}
-        onSubmit={handleSubmit}
-        centered={false}
-        sessionId={sessionId}
-        onUploadComplete={loadDocuments}
-        documents={documents} // 🔥 NEW: Pass documents to InputBar
-        showDocumentsAboveInput={true} // 🔥 NEW: Flag to show docs above input
-      />
-    </div>
-  </div>
-);
+  );
 
 }
 export default Home;

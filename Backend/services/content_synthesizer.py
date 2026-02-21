@@ -140,8 +140,8 @@ class ContentSynthesizer:
 
                     **Instructions**:
                     1. **Synthesize** information from the sources to create a comprehensive answer
-                    2. **Use proper citations** - Reference sources as [1], [2], etc. throughout your response
-                    3. **Be accurate** - Only use information that's clearly supported by the sources
+                    2. **Use proper citations** - You MUST reference sources using bracketed numbers, specifically [1], [2], etc., corresponding to the Source ID.
+                    3. **Be accurate** - Only use information that's clearly supported by the sources. Do not hallucinate.
                     4. **Structure well** - Use headers, bullet points, and clear organization
                     5. **Be comprehensive** - Cover all relevant aspects of the query
                     6. **Maintain objectivity** - Present balanced information when there are different viewpoints
@@ -154,8 +154,9 @@ class ContentSynthesizer:
                     - End with a brief summary if the response is long
 
                     **Citation Rules**:
-                    - Cite sources immediately after relevant statements: "Quantum computers use qubits[1][3]"
-                    - Use multiple citations when information comes from multiple sources
+                    - Cite sources immediately after relevant statements: "Quantum computers use qubits [1]."
+                    - DO NOT use markdown links for citations. Just use the raw bracket: [1]
+                    - Use multiple citations when information comes from multiple sources: "Apple and Google are tech companies [1][2]."
                     - Never make claims without citing sources
                     - Ensure every major fact or claim has proper citation
 

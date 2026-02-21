@@ -4,6 +4,7 @@ langchain-tavily
 langchain-groq
 langchain-core
 langchain-community
+langchain-huggingface==0.1.2
 python-dotenv
 fastapi
 fastapi[standard]

@@ -1,0 +1,48 @@
+# Core FastAPI
+fastapi[standard]
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+
+# AI & ML (Optimized for HF Spaces)
+sentence-transformers
+transformers
+torch
+huggingface-hub
+
+# LangChain Ecosystem
+langchain
+langchain-core
+langchain-groq
+langchain-tavily
+langgraph
+langchain-huggingface==0.1.2
+
+# AI Services
+groq
+
+# Document Processing
+PyPDF2
+PyMuPDF
+aiofiles
+
+# Vector Database
+chromadb
+
+# Utilities
+python-dotenv
+python-decouple
+requests
+httpx
+
+# Data Processing
+numpy
+pandas
+PyMuPDF
+python-decouple
+pytesseract
+tiktoken
+chromadb
+requests
+httpx

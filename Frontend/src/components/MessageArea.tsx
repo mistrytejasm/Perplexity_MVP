@@ -31,10 +31,10 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                         )}
                         <div className="flex flex-col">
                             <span className="font-medium mb-2 ml-2">
-                                {searchInfo.source === 'documents' ? 'Searching documents' : 
-                                searchInfo.source === 'web' ? 'Searching the web' : 'Searching the web'}
+                                {searchInfo.source === 'documents' ? 'Searching documents' :
+                                    searchInfo.source === 'web' ? 'Searching the web' : 'Searching the web'}
                             </span>
-                            
+
                             {/* Show ALL Queries - Original + Sub-queries */}
                             <div className="flex flex-wrap gap-2 pl-2 mt-1">
                                 {/* Original Query */}
@@ -47,7 +47,7 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                                         <span className="ml-1 text-blue-600">{searchInfo.query}</span>
                                     </div>
                                 )}
-                                
+
                                 {/* ALL Sub-Queries */}
                                 {searchInfo.subQueries && searchInfo.subQueries.length > 0 && (
                                     searchInfo.subQueries.map((subQuery: string, index: number) => (
@@ -66,7 +66,7 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                         <div className="absolute -left-3 top-1 w-2.5 h-2.5 bg-teal-400 rounded-full z-10 shadow-sm"></div>
                         <div className="flex flex-col">
                             <span className="font-medium mb-2 ml-2">Reading sources</span>
-                            
+
                             {/* Show ALL Web Sources */}
                             {searchInfo.webSources && searchInfo.webSources.length > 0 && (
                                 <div className="pl-2 space-y-1 mb-2">
@@ -81,7 +81,7 @@ const SearchStages = ({ searchInfo }: { searchInfo: any }) => {
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Show ALL Document Sources */}
                             {searchInfo.documentSources && searchInfo.documentSources.length > 0 && (
                                 <div className="pl-2 space-y-1">
@@ -211,7 +211,7 @@ const parseMarkdown = (content: string) => {
                             {codeLanguage}
                         </div>
                     )}
-                    
+
                     {/* Code block with syntax highlighting */}
                     <SyntaxHighlighter
                         language={codeLanguage || 'text'}
@@ -227,7 +227,7 @@ const parseMarkdown = (content: string) => {
                     >
                         {codeString}
                     </SyntaxHighlighter>
-                    
+
                     {/* Copy button */}
                     <button
                         className="absolute top-2 right-2 p-2 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
@@ -247,102 +247,103 @@ const parseMarkdown = (content: string) => {
     };
 
     const formatInlineMarkdown = (text: string): JSX.Element => {
-    if (!text) return <span></span>;
-    
-    // First, handle citations [1](url)
-    const elements: (string | JSX.Element)[] = [];
-    const citationRegex = /\[(\d+)\]\((https?:\/\/[^\s)]+)\)/g;
-    let lastIndex = 0;
-    let match;
-    
-    while ((match = citationRegex.exec(text)) !== null) {
-        if (match.index > lastIndex) {
-            elements.push(text.substring(lastIndex, match.index));
-        }
-        const citationNumber = match[1];
-        const citationUrl = match[2];
-        elements.push(
-            <a
-                key={`citation-${match.index}`}
-                href={citationUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center w-6 h-6 text-xs bg-blue-100 text-blue-700 rounded border border-blue-300 hover:bg-blue-200 transition-colors duration-150 ml-1 no-underline font-medium"
-                title={`Source: ${citationUrl}`}
-            >
-                {citationNumber}
-            </a>
-        );
-        lastIndex = citationRegex.lastIndex;
-    }
-    
-    if (lastIndex < text.length) {
-        elements.push(text.substring(lastIndex));
-    }
-    
-    // Process each element for inline formatting
-    const processInlineFormatting = (textChunk: string, keyPrefix: number): (string | JSX.Element)[] => {
-        if (!textChunk || typeof textChunk !== 'string') return [textChunk];
-        
-        const results: (string | JSX.Element)[] = [];
-        
-        // Combined regex for bold, italic, and inline code
-        const inlineRegex = /(\*\*[^*]+\*\*)|(\*[^*]+\*)|(`[^`]+`)/g;
-        let lastIdx = 0;
-        let inlineMatch;
-        
-        while ((inlineMatch = inlineRegex.exec(textChunk)) !== null) {
-            // Add text before match
-            if (inlineMatch.index > lastIdx) {
-                results.push(textChunk.substring(lastIdx, inlineMatch.index));
+        if (!text) return <span></span>;
+
+        // First, handle simple citations [1]
+        const elements: (string | JSX.Element)[] = [];
+        const citationRegex = /\[(\d+|Source\s*\d+|Web\s*\d+|Document\s*\d+)\]/gi;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = citationRegex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                elements.push(text.substring(lastIndex, match.index));
             }
-            
-            if (inlineMatch[1]) {
-                // Bold: **text**
-                results.push(
-                    <strong key={`${keyPrefix}-bold-${inlineMatch.index}`} className="font-semibold text-gray-900">
-                        {inlineMatch[1].slice(2, -2)}
-                    </strong>
-                );
-            } else if (inlineMatch[2]) {
-                // Italic: *text*
-                results.push(
-                    <em key={`${keyPrefix}-italic-${inlineMatch.index}`} className="italic">
-                        {inlineMatch[2].slice(1, -1)}
-                    </em>
-                );
-            } else if (inlineMatch[3]) {
-                // Inline code: `code`
-                results.push(
-                    <code key={`${keyPrefix}-code-${inlineMatch.index}`} className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
-                        {inlineMatch[3].slice(1, -1)}
-                    </code>
-                );
+            const citationText = match[1];
+
+            // Extract just the number if it's "Source 1" or "Web 2"
+            const numberMatch = citationText.match(/\d+/);
+            const citationNumber = numberMatch ? numberMatch[0] : citationText;
+
+            elements.push(
+                <span
+                    key={`citation-${match.index}`}
+                    className="inline-flex items-center justify-center min-w-[24px] px-1 h-6 text-xs bg-blue-100 text-blue-700 rounded border border-blue-300 hover:bg-blue-200 transition-colors duration-150 mx-1 cursor-pointer font-medium"
+                    title={`Citation: ${citationText}`}
+                >
+                    {citationNumber}
+                </span>
+            );
+            lastIndex = citationRegex.lastIndex;
+        }
+
+        if (lastIndex < text.length) {
+            elements.push(text.substring(lastIndex));
+        }
+
+        // Process each element for inline formatting
+        const processInlineFormatting = (textChunk: string, keyPrefix: number): (string | JSX.Element)[] => {
+            if (!textChunk || typeof textChunk !== 'string') return [textChunk];
+
+            const results: (string | JSX.Element)[] = [];
+
+            // Combined regex for bold, italic, and inline code
+            const inlineRegex = /(\*\*[^*]+\*\*)|(\*[^*]+\*)|(`[^`]+`)/g;
+            let lastIdx = 0;
+            let inlineMatch;
+
+            while ((inlineMatch = inlineRegex.exec(textChunk)) !== null) {
+                // Add text before match
+                if (inlineMatch.index > lastIdx) {
+                    results.push(textChunk.substring(lastIdx, inlineMatch.index));
+                }
+
+                if (inlineMatch[1]) {
+                    // Bold: **text**
+                    results.push(
+                        <strong key={`${keyPrefix}-bold-${inlineMatch.index}`} className="font-semibold text-gray-900">
+                            {inlineMatch[1].slice(2, -2)}
+                        </strong>
+                    );
+                } else if (inlineMatch[2]) {
+                    // Italic: *text*
+                    results.push(
+                        <em key={`${keyPrefix}-italic-${inlineMatch.index}`} className="italic">
+                            {inlineMatch[2].slice(1, -1)}
+                        </em>
+                    );
+                } else if (inlineMatch[3]) {
+                    // Inline code: `code`
+                    results.push(
+                        <code key={`${keyPrefix}-code-${inlineMatch.index}`} className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm font-mono">
+                            {inlineMatch[3].slice(1, -1)}
+                        </code>
+                    );
+                }
+
+                lastIdx = inlineRegex.lastIndex;
             }
-            
-            lastIdx = inlineRegex.lastIndex;
-        }
-        
-        // Add remaining text
-        if (lastIdx < textChunk.length) {
-            results.push(textChunk.substring(lastIdx));
-        }
-        
-        return results;
+
+            // Add remaining text
+            if (lastIdx < textChunk.length) {
+                results.push(textChunk.substring(lastIdx));
+            }
+
+            return results;
+        };
+
+        // Apply inline formatting to all text elements
+        const finalElements: (string | JSX.Element)[] = [];
+        elements.forEach((element, idx) => {
+            if (typeof element === 'string') {
+                finalElements.push(...processInlineFormatting(element, idx));
+            } else {
+                finalElements.push(element);
+            }
+        });
+
+        return <span>{finalElements}</span>;
     };
-    
-    // Apply inline formatting to all text elements
-    const finalElements: (string | JSX.Element)[] = [];
-    elements.forEach((element, idx) => {
-        if (typeof element === 'string') {
-            finalElements.push(...processInlineFormatting(element, idx));
-        } else {
-            finalElements.push(element);
-        }
-    });
-    
-    return <span>{finalElements}</span>;
-};
 
 
     lines.forEach((line, index) => {
@@ -363,7 +364,7 @@ const parseMarkdown = (content: string) => {
             }
             return;
         }
-        
+
         // If we're in a code block, collect the lines
         if (inCodeBlock) {
             codeBlock.push(line);
@@ -466,7 +467,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
 
     // Auto-scroll function
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ 
+        messagesEndRef.current?.scrollIntoView({
             behavior: 'smooth',
             block: 'end'
         });
@@ -474,7 +475,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
 
     // Manual scroll to bottom (for button)
     const scrollToBottomInstant = () => {
-        messagesEndRef.current?.scrollIntoView({ 
+        messagesEndRef.current?.scrollIntoView({
             behavior: 'smooth',
             block: 'end'
         });
@@ -509,10 +510,10 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
     return (
         // <div className="bg-[#FCFCF8] px-4 py-6">
 
-        <div 
-        ref={containerRef}
-            onScroll={handleScroll} 
-            className="flex-1 overflow-y-auto bg-[#FCFCF8] px-4 py-6 relative"  
+        <div
+            ref={containerRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto bg-[#FCFCF8] px-4 py-6 relative"
         >
             {/* Center the conversation with max width like Perplexity */}
             <div className="max-w-3xl mx-auto">
@@ -546,7 +547,7 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
                         </div>
                     </div>
                 ))}
-                
+
                 {/* Extra bottom spacing so last message isn't hidden behind fixed input */}
                 <div className="h-6"></div>
                 <div ref={messagesEndRef} />
@@ -558,10 +559,10 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages }) => {
                     className="fixed bottom-24 right-8 w-12 h-12 bg-white border border-gray-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-20 hover:bg-gray-50"
                     title="Scroll to bottom"
                 >
-                    <svg 
-                        className="w-5 h-5 text-gray-600" 
-                        fill="none" 
-                        stroke="currentColor" 
+                    <svg
+                        className="w-5 h-5 text-gray-600"
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                     >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />

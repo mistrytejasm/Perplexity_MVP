@@ -184,10 +184,15 @@ DOCUMENT EXCERPTS:
 
 USER QUESTION: {message}
 
-Provide a comprehensive answer with citations [Source X, Page Y]."""
+INSTRUCTIONS:
+1. Provide a comprehensive and accurate answer.
+2. You MUST cite your sources using bracketed numbers, e.g., [1], [2], corresponding to the Document Source number.
+3. Place the citation immediately after the fact it supports, like this: "The sky is blue [1]."
+4. Never make claims without citing the exact Document Source.
+5. If the document does not contain the answer, simply say "The provided documents do not contain information to answer this question." Do not hallucinate."""
                     
                     response = await groq_service.client.chat.completions.create(
-                        model="openai/gpt-oss-20b",
+                        model="openai/gpt-oss-120b",
                         messages=[
                             {"role": "system", "content": "You are a precise document analysis assistant. Always cite sources."},
                             {"role": "user", "content": document_prompt}
@@ -248,10 +253,15 @@ WEB SOURCES:
 
 USER QUESTION: {message}
 
-Provide a comprehensive answer that integrates information from both documents and web sources. Use citations like [Document Source X] and [Web Source Y]."""
+INSTRUCTIONS:
+1. Provide a comprehensive and accurate answer.
+2. You MUST cite your sources using bracketed numbers. For documents use [Document X], for web use [Web Y].
+3. Place the citation immediately after the fact it supports, like this: "The company revenue grew by 20% [Document 1] while their stock price doubled [Web 2]."
+4. Never make claims without citing a source.
+5. If the sources conflict, explicitly mention the difference in information."""
                     
                     response = await groq_service.client.chat.completions.create(
-                        model="openai/gpt-oss-20b",
+                        model="llama3-8b-8192",
                         messages=[
                             {"role": "system", "content": "You are an expert research assistant. Combine information from multiple sources effectively."},
                             {"role": "user", "content": hybrid_prompt}

@@ -8,15 +8,15 @@ interface InputBarProps {
   setCurrentMessage: (message: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   centered?: boolean;
-  sessionId?: string; 
+  sessionId?: string;
   onUploadComplete?: () => void;
   documents?: any[];
   showDocumentsAboveInput?: boolean;
 }
 
-const InputBar: React.FC<InputBarProps> = ({ 
-  currentMessage, 
-  setCurrentMessage, 
+const InputBar: React.FC<InputBarProps> = ({
+  currentMessage,
+  setCurrentMessage,
   onSubmit,
   centered = false,
   sessionId,
@@ -26,7 +26,7 @@ const InputBar: React.FC<InputBarProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [uploadedDocs, setUploadedDocs] = useState<{
     id: string;
     filename: string;
@@ -47,11 +47,11 @@ const InputBar: React.FC<InputBarProps> = ({
 
     try {
       // Update to processing status
-      setUploadedDocs(prev => prev.map(doc => 
+      setUploadedDocs(prev => prev.map(doc =>
         doc.id === uploadId ? { ...doc, status: 'processing' } : doc
       ));
 
-      const response = await fetch('https://mistrytejasm-perplexity-mvp.hf.space/documents/upload', {
+      const response = await fetch('http://localhost:8000/documents/upload', {
         method: 'POST',
         body: formData,
       });
@@ -59,7 +59,7 @@ const InputBar: React.FC<InputBarProps> = ({
       if (response.ok) {
         const result = await response.json();
         console.log('Upload successful:', result);
-        setUploadedDocs(prev => prev.map(doc => 
+        setUploadedDocs(prev => prev.map(doc =>
           doc.id === uploadId ? { ...doc, status: 'ready' } : doc
         ));
 
@@ -74,11 +74,11 @@ const InputBar: React.FC<InputBarProps> = ({
       }
     } catch (error) {
       console.error('Upload failed:', error);
-      setUploadedDocs(prev => prev.map(doc => 
+      setUploadedDocs(prev => prev.map(doc =>
         doc.id === uploadId ? { ...doc, status: 'error' } : doc
       ));
     }
-  }; 
+  };
 
   // Auto-focus input when centered
   useEffect(() => {
@@ -86,29 +86,29 @@ const InputBar: React.FC<InputBarProps> = ({
       textareaRef.current.focus();
     }
   }, [centered]);
-  
+
 
   // Handle submit from button click
   const handleSendClick = () => {
     if (currentMessage.trim()) {
       const syntheticEvent = {
-        preventDefault: () => {}
+        preventDefault: () => { }
       } as React.FormEvent;
       onSubmit(syntheticEvent);
     }
   };
 
   // Container styles based on mode
-  const containerClasses = centered 
-    ? "w-full" 
+  const containerClasses = centered
+    ? "w-full"
     : "bg-[#FCFCF8] border-t border-gray-200 backdrop-blur-sm bg-opacity-95 shadow-lg";
 
   const innerContainerClasses = centered
-    ? "w-full"  
+    ? "w-full"
     : "max-w-3xl mx-auto px-4 py-4";
 
   const inputClasses = centered
-    ? "w-full px-6 py-4 text-sm" 
+    ? "w-full px-6 py-4 text-sm"
     : "px-4 py-3";
 
   // 🔧 FIXED: Calculate total document count properly
@@ -252,8 +252,8 @@ const InputBar: React.FC<InputBarProps> = ({
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) {
-                console.log('File selected:', file.name); 
-                
+                console.log('File selected:', file.name);
+
                 // Show file immediately when selected
                 const uploadId = Date.now().toString();
                 setUploadedDocs(prev => [...prev, {
@@ -261,11 +261,11 @@ const InputBar: React.FC<InputBarProps> = ({
                   filename: file.name,
                   status: 'uploading'
                 }]);
-                
+
                 // Then start the upload process
                 handleFileUploadWithId(file, uploadId);
               }
-              
+
               // Reset file input so same file can be selected again
               e.target.value = '';
             }}
