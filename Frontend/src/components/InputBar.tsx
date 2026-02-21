@@ -101,15 +101,15 @@ const InputBar: React.FC<InputBarProps> = ({
   // Container styles based on mode
   const containerClasses = centered
     ? "w-full"
-    : "bg-white border-t border-gray-200 pb-4 z-50";
+    : "w-full pb-6 sm:pb-8 z-50 relative pointer-events-none flex justify-center";
 
   const innerContainerClasses = centered
     ? "w-full"
-    : "max-w-3xl mx-auto px-4 pt-4";
+    : "max-w-3xl w-full px-4 sm:px-6 pointer-events-auto";
 
   const inputClasses = centered
     ? "w-full px-6 py-4 text-sm"
-    : "px-4 py-3 text-sm";
+    : "w-full px-5 py-3.5 text-[15px]";
 
   // 🔧 FIXED: Calculate total document count properly
   const totalDocumentCount = (documents?.length || 0) + uploadedDocs.filter(doc => doc.status === 'ready').length;
@@ -192,7 +192,7 @@ const InputBar: React.FC<InputBarProps> = ({
               placeholder={centered ? "Ask anything..." : "Ask anything..."}
               minRows={1}
               maxRows={centered ? 8 : 5}
-              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent ${centered ? 'shadow-xl' : 'shadow-sm'} text-gray-900 transition-all`}
+              className={`w-full ${inputClasses} pb-14 bg-white border border-gray-300 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent ${centered ? 'shadow-xl' : 'shadow-[0_0_40px_rgba(0,0,0,0.05)]'} text-gray-900 transition-all`}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();

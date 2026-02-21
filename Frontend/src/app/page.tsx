@@ -465,12 +465,12 @@ const Home = () => {
       {/* Remove the header completely - we'll show docs above input instead */}
 
       {/* Message Area - No top padding since no header, add right padding if source is open */}
-      <div className={`flex-1 overflow-y-auto pb-24 transition-all duration-300 ${selectedSourceData ? 'pr-80' : ''}`}>
+      <div className={`flex-1 overflow-y-auto pb-36 transition-all duration-300 ${selectedSourceData ? 'pr-80' : ''}`}>
         <MessageArea messages={messages} onSourceClick={(source, allSources) => setSelectedSourceData({ source, allSources })} />
       </div>
 
-      {/* Input Bar - Fixed at bottom WITH document display above */}
-      <div className={`fixed bottom-0 left-0 right-0 z-10 transition-all duration-300 ${selectedSourceData ? 'pr-80' : ''}`}>
+      {/* Input Bar - Floating at bottom WITH document display above */}
+      <div className={`fixed bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-white via-white/95 to-transparent pt-10 pointer-events-none transition-all duration-300 ${selectedSourceData ? 'pr-80' : ''}`}>
         <InputBar
           currentMessage={currentMessage}
           setCurrentMessage={setCurrentMessage}
