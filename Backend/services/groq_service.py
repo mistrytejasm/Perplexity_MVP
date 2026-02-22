@@ -18,10 +18,17 @@ class GroqService:
     def __init__(self):
         self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
-    async def analyze_query(self, query: str, has_documents: bool = False) -> QueryAnalysis:
+    async def analyze_query(
+        self,
+        query: str,
+        has_documents: bool = False,
+        history: list = None
+    ) -> QueryAnalysis:
         """
         Analyze user query to understand intent and generate date-aware search terms.
         Injects current date so real-time queries include the correct year/month.
+        Accepts conversation history so follow-up queries like 'code for this' are
+        correctly resolved to their actual topic before generating search terms.
 
         If has_documents=True, the LLM is also asked to produce a `query_intent`
         field that classifies the user's intent relative to the uploaded document:
@@ -32,6 +39,27 @@ class GroqService:
         today = datetime.now().strftime("%A, %B %d, %Y")
         current_year = datetime.now().year
         current_month = datetime.now().strftime("%B %Y")
+
+        # ── Build conversation context block for follow-up resolution ─────────
+        # Include at most the last 2 turns (user + assistant) so the LLM can
+        # resolve pronouns like "this", "it", "that" without a huge context window.
+        context_block = ""
+        if history:
+            recent = history[-4:]          # last 2 user+assistant pairs (4 msgs max)
+            ctx_lines = []
+            for msg in recent:
+                role = "User" if msg["role"] == "user" else "Assistant"
+                # Truncate long AI responses to keep the prompt lean
+                content = msg["content"]
+                if len(content) > 400:
+                    content = content[:400] + "..."
+                ctx_lines.append(f"{role}: {content}")
+            if ctx_lines:
+                context_block = (
+                    "Conversation so far (for resolving follow-up references):\n"
+                    + "\n".join(ctx_lines)
+                    + "\n\n"
+                )
 
         # ── Build the dynamic parts of the prompt based on document presence ──
         if has_documents:
@@ -61,7 +89,9 @@ Rules for query_intent (ONLY applicable when a document is uploaded):
 
 You are an expert query analyzer for a real-time search engine. Analyze the user query below and return a JSON object.
 
-Query: "{query}"
+{context_block}Current Query: "{query}"
+
+IMPORTANT: If the current query contains vague references like "this", "it", "that", "the same", "more of", "code for this", etc., resolve them using the conversation context above before generating search terms. For example, if the user previously asked about RAG pipelines and now says "give me code for this", search for "RAG pipeline Python code implementation".
 
 Return ONLY valid JSON in this EXACT format (no markdown, no explanation):
 {{

@@ -10,27 +10,37 @@ class QueryAnalyzer:
     def __init__(self):
         self.groq_service = GroqService()
 
-    async def process_query(self, request: SearchRequest, has_documents: bool = False) -> QueryAnalysis:
+    async def process_query(
+        self,
+        request: SearchRequest,
+        has_documents: bool = False,
+        history: list = None
+    ) -> QueryAnalysis:
         """
         Main method to process and analyze user query.
 
         Args:
             request: The incoming SearchRequest with the user message.
             has_documents: True when the session already has uploaded documents.
-                           Causes the analyzer to also classify query_intent:
-                           'doc_summary', 'doc_qa', or 'general_web'.
+            history: Conversation history ({role, content} dicts) for follow-up
+                     reference resolution (e.g. 'code for this').
         """
 
         # 1. Clean and validate query
         cleaned_query = self._clean_query(request.query)
 
-        # 2. Pre-analysis check — only skip LLM for simple queries when no docs present
-        #    (when docs are present we ALWAYS want the full intent classification)
-        if not has_documents and self._is_simple_query(cleaned_query):
+        # 2. Pre-analysis check — skip LLM only for simple queries with no docs
+        #    AND no conversation history (history might contain reference context).
+        has_history = bool(history)
+        if not has_documents and not has_history and self._is_simple_query(cleaned_query):
             return await self._handle_simple_query(request.query)
 
-        # 3. Full LLM analysis with optional document-awareness
-        return await self.groq_service.analyze_query(cleaned_query, has_documents=has_documents)
+        # 3. Full LLM analysis with optional document-awareness and history
+        return await self.groq_service.analyze_query(
+            cleaned_query,
+            has_documents=has_documents,
+            history=history
+        )
 
     def _clean_query(self, query: str) -> str:
         """clean and normalize query"""

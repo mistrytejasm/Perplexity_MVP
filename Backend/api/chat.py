@@ -178,8 +178,16 @@ def _build_web_prompt(today: str, web_context: str, message: str) -> str:
         f"{web_context}\n"
         f"QUESTION: {message}\n\n"
         f"{_CRITICAL_CITATION_RULES}"
-        f"- For time-sensitive data (scores, schedules), ALWAYS state the date from the source.\n"
-        f"- If sources conflict, prefer the most recently published one and say so."
+        f"- For time-sensitive data (scores, schedules), ALWAYS state the date AND time from the source.\n"
+        f"- If sources conflict, prefer the most recently published one and say so.\n"
+        f"- For LIVE CRICKET or SPORTS queries, you MUST extract and present:\n"
+        f"  * Current score (runs/wickets/overs) for each team\n"
+        f"  * Which team is batting and which is bowling\n"
+        f"  * Active batsmen at the crease and their scores\n"
+        f"  * Current bowler and their figures (overs-maidens-runs-wickets)\n"
+        f"  * Match venue, format (T20/ODI/Test), and current phase\n"
+        f"  If the sources do not provide some of these details, say 'data not available in sources'.\n"
+        f"  NEVER give a generic answer when specific scorecard data is present in the sources."
     )
 
 
@@ -237,7 +245,8 @@ async def chat_stream(
             logger.info(f"📂 session_has_docs={session_has_docs}  session_id={session_id}")
             analysis = await query_analyzer.process_query(
                 SearchRequest(query=message),
-                has_documents=session_has_docs
+                has_documents=session_has_docs,
+                history=history or []
             )
             query_intent = analysis.query_intent  # None when no docs
             is_multi_part = len(analysis.suggested_searches) > 1 or " and " in message.lower() or "?" in message[:-1]

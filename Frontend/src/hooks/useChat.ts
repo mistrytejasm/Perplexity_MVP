@@ -26,12 +26,13 @@ export interface Message {
 
 const generateSessionId = () => 'session_' + Date.now();
 
+
 export const useChat = () => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [currentMessage, setCurrentMessage] = useState("");
     const [checkpointId, setCheckpointId] = useState<string | null>(null);
     const [hasStartedChat, setHasStartedChat] = useState(false);
-    const [sessionId, setSessionId] = useState('');
+
     const [documents, setDocuments] = useState<any[]>([]);
     const [showDocuments, setShowDocuments] = useState(false);
     const [selectedSourceData, setSelectedSourceData] = useState<{ source?: any, allSources: any[] } | null>(null);
@@ -47,16 +48,10 @@ export const useChat = () => {
         error?: string;
     }[]>([]);
 
-    useEffect(() => {
-        const existingSession = localStorage.getItem('perplexity_session_id');
-        if (existingSession) {
-            setSessionId(existingSession);
-        } else {
-            const newSession = generateSessionId();
-            setSessionId(newSession);
-            localStorage.setItem('perplexity_session_id', newSession);
-        }
-    }, []);
+    // Always start with a brand-new session ID so old documents from a
+    // previous browser session never bleed into a fresh page load.
+    const [sessionId] = useState<string>(() => generateSessionId());
+
 
     const loadDocuments = async () => {
         if (!sessionId) return;
@@ -84,11 +79,14 @@ export const useChat = () => {
         }
     };
 
+    // Only load documents when the user is in an active conversation.
+    // This prevents showing old docs from a previous session on a fresh page load.
     useEffect(() => {
-        if (sessionId) {
+        if (sessionId && hasStartedChat) {
             loadDocuments();
         }
-    }, [sessionId]);
+    }, [sessionId, hasStartedChat]);
+
 
     const handleRemoveDocument = async (documentId: string) => {
         try {
