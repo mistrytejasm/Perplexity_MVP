@@ -4,7 +4,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Globe, FileText, CheckCircle2, CircleDashed, Loader2, Sparkles, Plus, Copy, Check, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react';
 import SourceCard from './SourceCard';
-
+import ModelBadge from '../ui/ModelBadge';
 
 // Improvement #7: 3-dot bouncing typing indicator
 const TypingDots = () => (
@@ -613,6 +613,8 @@ interface Message {
     type: string;
     isLoading?: boolean;
     searchInfo?: any;
+    modelUsed?: string;
+    modelDisplayName?: string;
 }
 interface MessageAreaProps {
     messages: Message[];
@@ -772,6 +774,15 @@ const MessageArea: React.FC<MessageAreaProps> = ({ messages, onSourceClick, onSu
                                                         )}
                                                     </div>
                                                 ) : null}
+
+                                                {/* Model Badge + RAG Fallback indicator */}
+                                                {!message.isLoading && message.content && (
+                                                    <ModelBadge
+                                                        modelUsed={message.modelUsed}
+                                                        displayName={message.modelDisplayName}
+                                                        ragFallback={message.searchInfo?.ragFallback}
+                                                    />
+                                                )}
 
                                                 {/* Action Bar (Copy / Feedback) */}
                                                 {!message.isLoading && message.content && (

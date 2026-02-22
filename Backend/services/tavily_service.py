@@ -22,6 +22,21 @@ class TavilyService:
     # Domains to always exclude
     EXCLUDED_DOMAINS = ["youtube.com", "tiktok.com", "instagram.com", "reddit.com"]
 
+    # Domains to PREFER for sports/live score queries
+    SPORTS_LIVE_DOMAINS = [
+        "espncricinfo.com", "cricbuzz.com", "icc-cricket.com",
+        "bcci.tv", "espn.com", "ndtv.com/cricket",
+        "cricketwa.com", "wisden.com", "crictracker.com",
+    ]
+
+    # Keywords that indicate a live sports score query
+    SPORTS_KEYWORDS = [
+        "score", "match", "cricket", "ipl", "t20", "odi", "test match",
+        "batting", "bowling", "wicket", "run", "over", "innings",
+        "football", "soccer", "goal", "premier league", "fifa",
+        "nba", "nfl", "live", "today match", "current score",
+    ]
+
     def __init__(self):
         self.api_key = settings.TAVILY_API_KEY
 
@@ -80,6 +95,10 @@ class TavilyService:
     ) -> Dict[str, Any]:
         """Execute a single Tavily search with appropriate config."""
 
+        # Detect sports/live-score context
+        query_lower = query.lower()
+        is_sports = any(kw in query_lower for kw in self.SPORTS_KEYWORDS)
+
         payload: Dict[str, Any] = {
             "api_key": self.api_key,
             "query": query,
@@ -93,7 +112,11 @@ class TavilyService:
             # Advanced mode: fresh news sources, last 24 hours preferred
             payload["search_depth"] = "advanced"
             payload["topic"] = "news"
-            payload["days"] = 3             # Last 3 days for real-time relevance
+            payload["days"] = 1             # Last 24 hours — truly live data
+            # For sports queries, bias toward authoritative scoreboard sites
+            if is_sports:
+                payload["include_domains"] = self.SPORTS_LIVE_DOMAINS
+                logger.info(f"  ↳ Sports query detected — biasing toward live sports domains")
         else:
             payload["search_depth"] = "basic"
 

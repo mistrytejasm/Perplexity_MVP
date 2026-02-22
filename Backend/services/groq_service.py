@@ -18,20 +18,80 @@ class GroqService:
     def __init__(self):
         self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
-    async def analyze_query(self, query: str) -> QueryAnalysis:
+    async def analyze_query(
+        self,
+        query: str,
+        has_documents: bool = False,
+        history: list = None
+    ) -> QueryAnalysis:
         """
         Analyze user query to understand intent and generate date-aware search terms.
         Injects current date so real-time queries include the correct year/month.
+        Accepts conversation history so follow-up queries like 'code for this' are
+        correctly resolved to their actual topic before generating search terms.
+
+        If has_documents=True, the LLM is also asked to produce a `query_intent`
+        field that classifies the user's intent relative to the uploaded document:
+          - doc_summary : wants a general overview / summary of the uploaded doc
+          - doc_qa      : asks a specific question (answer expected from the doc first)
+          - general_web : clearly unrelated to any uploaded document
         """
         today = datetime.now().strftime("%A, %B %d, %Y")
         current_year = datetime.now().year
         current_month = datetime.now().strftime("%B %Y")
 
+        # ── Build conversation context block for follow-up resolution ─────────
+        # Include at most the last 2 turns (user + assistant) so the LLM can
+        # resolve pronouns like "this", "it", "that" without a huge context window.
+        context_block = ""
+        if history:
+            recent = history[-4:]          # last 2 user+assistant pairs (4 msgs max)
+            ctx_lines = []
+            for msg in recent:
+                role = "User" if msg["role"] == "user" else "Assistant"
+                # Truncate long AI responses to keep the prompt lean
+                content = msg["content"]
+                if len(content) > 400:
+                    content = content[:400] + "..."
+                ctx_lines.append(f"{role}: {content}")
+            if ctx_lines:
+                context_block = (
+                    "Conversation so far (for resolving follow-up references):\n"
+                    + "\n".join(ctx_lines)
+                    + "\n\n"
+                )
+
+        # ── Build the dynamic parts of the prompt based on document presence ──
+        if has_documents:
+            intent_schema = '"query_intent": "doc_summary|doc_qa|general_web",'
+            intent_rules = """
+Rules for query_intent (ONLY applicable when a document is uploaded):
+- "doc_summary": Use this if the user is asking for a general overview of the document.
+  Trigger phrases: "what is this about", "what is this doc/pdf about", "summarize this",
+  "what does this contain", "explain this document", "overview of this pdf",
+  "what type of information", "tell me about this file", "what is in this pdf".
+- "doc_qa": Use this if the user asks a specific question that should logically be
+  answered from an uploaded document first (e.g. "what is the revenue?", "what
+  technologies are mentioned?", "what is the candidate's experience?"). This is the
+  DEFAULT when documents are present and the query is not clearly doc_summary or general_web.
+- "general_web": Use this ONLY if the query is blatantly unrelated to the user's
+  uploaded document — such as current events, sports scores, or general trivia that
+  could not possibly be in a private PDF (e.g. "who won the World Cup 2026",
+  "what is the capital of France")."""
+        else:
+            intent_schema = ""
+            intent_rules = ""
+
+        # Must pre-compute outside the f-string (backslashes not allowed inside f-string expressions)
+        intent_schema_line = (",\n    " + intent_schema) if has_documents else ""
+
         prompt = f"""Today is {today}.
 
 You are an expert query analyzer for a real-time search engine. Analyze the user query below and return a JSON object.
 
-Query: "{query}"
+{context_block}Current Query: "{query}"
+
+IMPORTANT: If the current query contains vague references like "this", "it", "that", "the same", "more of", "code for this", etc., resolve them using the conversation context above before generating search terms. For example, if the user previously asked about RAG pipelines and now says "give me code for this", search for "RAG pipeline Python code implementation".
 
 Return ONLY valid JSON in this EXACT format (no markdown, no explanation):
 {{
@@ -40,7 +100,7 @@ Return ONLY valid JSON in this EXACT format (no markdown, no explanation):
     "key_entities": ["entity1", "entity2"],
     "suggested_searches": ["search_term_1", "search_term_2", "search_term_3"],
     "requires_real_time": true or false,
-    "complexity_score": 5
+    "complexity_score": 5{intent_schema_line}
 }}
 
 Rules for suggested_searches:
@@ -58,7 +118,7 @@ Rules for requires_real_time:
 Rules for complexity_score (integer 1–10):
 - 1–3: simple fact, single answer
 - 4–6: moderate research needed  
-- 7–10: multi-part, comparative, or research-heavy"""
+- 7–10: multi-part, comparative, or research-heavy{intent_rules}"""
 
         try:
             response = await self.client.chat.completions.create(
@@ -92,8 +152,21 @@ Rules for complexity_score (integer 1–10):
             score = int(analysis_data.get("complexity_score", 5))
             analysis_data["complexity_score"] = max(1, min(10, score))
 
+            # Validate / normalise query_intent
+            valid_intents = {"doc_summary", "doc_qa", "general_web"}
+            raw_intent = analysis_data.get("query_intent")
+            if has_documents:
+                if raw_intent not in valid_intents:
+                    # Default to doc_qa when documents are present and intent is unclear
+                    analysis_data["query_intent"] = "doc_qa"
+                    logger.warning(f"⚠️ LLM returned invalid query_intent '{raw_intent}', defaulting to 'doc_qa'")
+            else:
+                # No documents — intent field is irrelevant
+                analysis_data["query_intent"] = None
+
             logger.info(
                 f"✅ Query analyzed: type={analysis_data.get('query_type')}, "
+                f"intent={analysis_data.get('query_intent')}, "
                 f"real_time={analysis_data.get('requires_real_time')}, "
                 f"searches={analysis_data.get('suggested_searches')}"
             )
@@ -102,13 +175,13 @@ Rules for complexity_score (integer 1–10):
 
         except json.JSONDecodeError as e:
             logger.error(f"❌ JSON parse error in analyze_query: {e} | Raw: {raw[:200]}")
-            return self._create_fallback_analysis(query)
+            return self._create_fallback_analysis(query, has_documents)
 
         except Exception as e:
             logger.error(f"❌ Groq API error in analyze_query: {e}")
-            return self._create_fallback_analysis(query)
+            return self._create_fallback_analysis(query, has_documents)
 
-    def _create_fallback_analysis(self, query: str) -> QueryAnalysis:
+    def _create_fallback_analysis(self, query: str, has_documents: bool = False) -> QueryAnalysis:
         """Fallback when Groq fails — uses heuristics instead of LLM."""
         query_lower = query.lower()
         today_str = datetime.now().strftime("%B %Y")
@@ -133,11 +206,35 @@ Rules for complexity_score (integer 1–10):
                 f"{query} guide"
             ]
 
+        # Heuristic intent detection when documents are present
+        query_intent = None
+        if has_documents:
+            summary_phrases = [
+                "what is this", "what's this", "what does this", "tell me about",
+                "summarize", "summarise", "overview", "what type",
+                "what kind", "explain this", "what is in", "about this pdf",
+                "about this doc", "about the pdf", "about the document",
+                "what this pdf", "what this doc"
+            ]
+            general_web_keywords = [
+                "capital of", "who won", "world cup", "prime minister",
+                "president of", "weather in", "population of"
+            ]
+            if any(phrase in query_lower for phrase in summary_phrases):
+                query_intent = "doc_summary"
+            elif any(kw in query_lower for kw in general_web_keywords):
+                query_intent = "general_web"
+            else:
+                query_intent = "doc_qa"  # default when docs are present
+
         return QueryAnalysis(
             query_type="current_events" if is_real_time else "factual",
             search_intent=f"User wants information about: {query}",
             key_entities=[query[:50]],
             suggested_searches=suggested,
             complexity_score=5,
-            requires_real_time=is_real_time
+            requires_real_time=is_real_time,
+            query_intent=query_intent
         )
+
+

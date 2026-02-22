@@ -1,7 +1,8 @@
 "use client"
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Paperclip, Send, Mic, FileText, X } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
+import ModelSelector from '../ui/ModelSelector';
 
 interface InputBarProps {
   currentMessage: string;
@@ -12,6 +13,23 @@ interface InputBarProps {
   onUploadComplete?: () => void;
   documents?: any[];
   showDocumentsAboveInput?: boolean;
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
+  // Lifted state — lives in useChat so it survives landing → chat transition
+  uploadedDocs?: {
+    id: string;
+    filename: string;
+    status: 'uploading' | 'processing' | 'ready' | 'error';
+    progress?: number;
+    error?: string;
+  }[];
+  setUploadedDocs?: React.Dispatch<React.SetStateAction<{
+    id: string;
+    filename: string;
+    status: 'uploading' | 'processing' | 'ready' | 'error';
+    progress?: number;
+    error?: string;
+  }[]>>;
 }
 
 const InputBar: React.FC<InputBarProps> = ({
@@ -21,19 +39,15 @@ const InputBar: React.FC<InputBarProps> = ({
   centered = false,
   sessionId,
   onUploadComplete,
-  documents = [], // 🔥 FIXED: Add this prop
-  showDocumentsAboveInput = false // 🔥 FIXED: Add this prop
+  documents = [],
+  showDocumentsAboveInput = false,
+  selectedModel = 'auto',
+  onModelChange = () => { },
+  uploadedDocs = [],
+  setUploadedDocs,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [uploadedDocs, setUploadedDocs] = useState<{
-    id: string;
-    filename: string;
-    status: 'uploading' | 'processing' | 'ready' | 'error';
-    progress?: number;
-    error?: string;
-  }[]>([]);
 
   // 🔧 FIXED: Complete upload function with proper error handling
   const handleFileUploadWithId = async (file: File, uploadId: string) => {
@@ -47,8 +61,8 @@ const InputBar: React.FC<InputBarProps> = ({
 
     try {
       // Update to processing status
-      setUploadedDocs(prev => prev.map(doc =>
-        doc.id === uploadId ? { ...doc, status: 'processing' } : doc
+      setUploadedDocs?.(prev => prev.map(doc =>
+        doc.id === uploadId ? { ...doc, status: 'processing' as const } : doc
       ));
 
       const response = await fetch('http://localhost:8000/documents/upload', {
@@ -59,11 +73,10 @@ const InputBar: React.FC<InputBarProps> = ({
       if (response.ok) {
         const result = await response.json();
         console.log('Upload successful:', result);
-        setUploadedDocs(prev => prev.map(doc =>
-          doc.id === uploadId ? { ...doc, status: 'ready' } : doc
+        setUploadedDocs?.(prev => prev.map(doc =>
+          doc.id === uploadId ? { ...doc, status: 'ready' as const } : doc
         ));
 
-        // 🔧 This calls the parent component's loadDocuments function
         if (onUploadComplete) {
           setTimeout(() => {
             onUploadComplete();
@@ -74,8 +87,8 @@ const InputBar: React.FC<InputBarProps> = ({
       }
     } catch (error) {
       console.error('Upload failed:', error);
-      setUploadedDocs(prev => prev.map(doc =>
-        doc.id === uploadId ? { ...doc, status: 'error' } : doc
+      setUploadedDocs?.(prev => prev.map(doc =>
+        doc.id === uploadId ? { ...doc, status: 'error' as const } : doc
       ));
     }
   };
@@ -111,8 +124,11 @@ const InputBar: React.FC<InputBarProps> = ({
     ? "w-full px-6 py-4 text-sm"
     : "w-full px-5 py-3.5 text-[15px]";
 
-  // 🔧 FIXED: Calculate total document count properly
-  const totalDocumentCount = (documents?.length || 0) + uploadedDocs.filter(doc => doc.status === 'ready').length;
+  // In chat mode, the backend `documents` list is shown; in landing mode uploadedDocs is shown.
+  // Never add both together to avoid double-counting the same file.
+  const totalDocumentCount = showDocumentsAboveInput
+    ? (documents?.length || 0)
+    : uploadedDocs.filter(doc => doc.status === 'ready').length;
 
   return (
     <div className={containerClasses}>
@@ -139,8 +155,8 @@ const InputBar: React.FC<InputBarProps> = ({
           </div>
         )}
 
-        {/* PRE-CHAT MODE: Show uploadedDocs (always show if there are any) */}
-        {uploadedDocs.length > 0 && (
+        {/* PRE-CHAT MODE ONLY: Show uploadedDocs (hide in chat mode to avoid duplicates) */}
+        {!showDocumentsAboveInput && uploadedDocs.length > 0 && (
           <div className={`mb-3 ${centered ? 'mb-4' : ''}`}>
             <div className="flex flex-wrap gap-2">
               {uploadedDocs.map((doc) => (
@@ -169,7 +185,7 @@ const InputBar: React.FC<InputBarProps> = ({
                     )}
                   </div>
                   <button
-                    onClick={() => setUploadedDocs(prev => prev.filter(d => d.id !== doc.id))}
+                    onClick={() => setUploadedDocs?.(prev => prev.filter(d => d.id !== doc.id))}
                     className="text-blue-400 hover:text-blue-600 transition-colors flex-shrink-0"
                     title="Remove document"
                   >
@@ -204,42 +220,48 @@ const InputBar: React.FC<InputBarProps> = ({
           </form>
 
           {/* Bottom Button Bar */}
-          <div className="absolute bottom-3 right-4 flex items-center space-x-3">
-            {/* Attachment Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="relative w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
-              title="Upload document"
-            >
-              <Paperclip className="w-4 h-4" />
-              {/* 🔥 FIXED: Show total document count */}
-              {totalDocumentCount > 0 && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
-                  {totalDocumentCount}
-                </div>
-              )}
-            </button>
+          <div className="absolute bottom-3 left-3 right-4 flex items-center justify-between">
+            {/* Left side: model selector */}
+            <ModelSelector selectedModel={selectedModel} onModelChange={onModelChange} />
 
-            {/* Microphone Button */}
-            <button
-              type="button"
-              className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
-              title="Voice input"
-            >
-              <Mic className="w-4 h-4" />
-            </button>
+            {/* Right side: attachments, mic, send */}
+            <div className="flex items-center space-x-3">
+              {/* Attachment Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="relative w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
+                title="Upload document"
+              >
+                <Paperclip className="w-4 h-4" />
+                {/* 🔥 FIXED: Show total document count */}
+                {totalDocumentCount > 0 && (
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                    {totalDocumentCount}
+                  </div>
+                )}
+              </button>
 
-            {/* Send Button */}
-            <button
-              type="button"
-              onClick={handleSendClick}
-              disabled={!currentMessage.trim()}
-              className="w-8 h-8 rounded-full bg-gray-900 text-white hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
-              title="Send message"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
+              {/* Microphone Button */}
+              <button
+                type="button"
+                className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center justify-center transition-all duration-200"
+                title="Voice input"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+
+              {/* Send Button */}
+              <button
+                type="button"
+                onClick={handleSendClick}
+                disabled={!currentMessage.trim()}
+                className="w-8 h-8 rounded-full bg-gray-900 text-white hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center transition-all duration-200 shadow-sm"
+                title="Send message"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* Hidden File Input */}
@@ -254,10 +276,10 @@ const InputBar: React.FC<InputBarProps> = ({
 
                 // Show file immediately when selected
                 const uploadId = Date.now().toString();
-                setUploadedDocs(prev => [...prev, {
+                setUploadedDocs?.(prev => [...prev, {
                   id: uploadId,
                   filename: file.name,
-                  status: 'uploading'
+                  status: 'uploading' as const
                 }]);
 
                 // Then start the upload process

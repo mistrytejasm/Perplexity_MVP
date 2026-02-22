@@ -10,12 +10,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
-    def __init__(self):
+    def __init__(self, document_store: DocumentStore = None):
         self.upload_handler = DocumentUploadHandler()
         self.content_extractor = DocumentContentExtractor()
         self.chunking_service = DocumentChunkingService()
-        self.document_store = DocumentStore()
-    
+        # Use the injected singleton; create a new one only as last resort
+        self.document_store = document_store if document_store is not None else DocumentStore()
+        if document_store is None:
+            logger.warning("⚠️ DocumentProcessor created without injected document_store — using private instance. Sessions may not be visible to chat endpoint!")
+
     async def process_upload(self, file, session_id: str = None) -> Dict[str, Any]:
         """Complete document processing pipeline"""
         
