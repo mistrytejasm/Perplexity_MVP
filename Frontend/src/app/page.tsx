@@ -46,7 +46,11 @@ const Home = () => {
     setSelectedSourceData,
     loadDocuments,
     handleSubmit,
-    submitQuery
+    submitQuery,
+    selectedModel,
+    setSelectedModel,
+    uploadedDocs,
+    setUploadedDocs,
   } = useChat();
 
   return (
@@ -84,6 +88,10 @@ const Home = () => {
                   centered={true}
                   sessionId={sessionId}
                   onUploadComplete={loadDocuments}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  uploadedDocs={uploadedDocs}
+                  setUploadedDocs={setUploadedDocs}
                 />
               </div>
 
@@ -120,6 +128,10 @@ const Home = () => {
                   onUploadComplete={loadDocuments}
                   documents={documents}
                   showDocumentsAboveInput={true}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  uploadedDocs={uploadedDocs}
+                  setUploadedDocs={setUploadedDocs}
                 />
               </div>
 

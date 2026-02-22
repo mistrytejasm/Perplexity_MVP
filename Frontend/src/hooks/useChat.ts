@@ -10,6 +10,7 @@ export interface SearchInfo {
     webSources: any[];
     documentSources: any[];
     error?: string;
+    ragFallback?: string;  // message shown when PDF couldn't answer and web is used
 }
 
 export interface Message {
@@ -19,6 +20,8 @@ export interface Message {
     type: string;
     isLoading?: boolean;
     searchInfo?: SearchInfo;
+    modelUsed?: string;        // e.g. 'llama-3.3-70b-versatile'
+    modelDisplayName?: string; // e.g. 'Llama 3.3 70B'
 }
 
 const generateSessionId = () => 'session_' + Date.now();
@@ -32,6 +35,17 @@ export const useChat = () => {
     const [documents, setDocuments] = useState<any[]>([]);
     const [showDocuments, setShowDocuments] = useState(false);
     const [selectedSourceData, setSelectedSourceData] = useState<{ source?: any, allSources: any[] } | null>(null);
+    const [selectedModel, setSelectedModel] = useState<string>('auto');
+
+    // uploadedDocs lives HERE (not inside InputBar) so it survives the
+    // landing → chat view transition when hasStartedChat becomes true.
+    const [uploadedDocs, setUploadedDocs] = useState<{
+        id: string;
+        filename: string;
+        status: 'uploading' | 'processing' | 'ready' | 'error';
+        progress?: number;
+        error?: string;
+    }[]>([]);
 
     useEffect(() => {
         const existingSession = localStorage.getItem('perplexity_session_id');
@@ -49,7 +63,22 @@ export const useChat = () => {
         try {
             const response = await fetch(`http://localhost:8000/documents/session/${sessionId}`);
             const data = await response.json();
-            setDocuments(data.documents || []);
+
+            // Deduplicate by document_id (in case same file was uploaded twice to the session)
+            const seen = new Set<string>();
+            const unique = (data.documents || []).filter((doc: any) => {
+                if (seen.has(doc.document_id)) return false;
+                seen.add(doc.document_id);
+                return true;
+            });
+            setDocuments(unique);
+
+            // Once backend confirms the document, clear the frontend-only uploadedDocs
+            // to prevent the same file appearing as both an uploadedDoc chip AND a
+            // backend-confirmed chip at the same time.
+            if (unique.length > 0) {
+                setUploadedDocs([]);
+            }
         } catch (error) {
             console.error('Error loading documents:', error);
         }
@@ -202,7 +231,7 @@ export const useChat = () => {
                     }
                 ]);
 
-                let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}`;
+                let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}&model=${encodeURIComponent(selectedModel)}`;
                 if (checkpointId) url += `&checkpoint_id=${encodeURIComponent(checkpointId)}`;
 
                 const eventSource = new EventSource(url);
@@ -284,6 +313,34 @@ export const useChat = () => {
                                                 ].filter((source, index, arr) =>
                                                     arr.findIndex(s => s.url === source.url) === index
                                                 )
+                                            }
+                                        }
+                                        : msg
+                                )
+                            );
+                        }
+                        else if (data.type === 'model_selected') {
+                            setMessages(prev =>
+                                prev.map(msg =>
+                                    msg.id === aiResponseId
+                                        ? {
+                                            ...msg,
+                                            modelUsed: data.model,
+                                            modelDisplayName: data.display_name
+                                        }
+                                        : msg
+                                )
+                            );
+                        }
+                        else if (data.type === 'rag_fallback') {
+                            setMessages(prev =>
+                                prev.map(msg =>
+                                    msg.id === aiResponseId
+                                        ? {
+                                            ...msg,
+                                            searchInfo: {
+                                                ...msg.searchInfo!,
+                                                ragFallback: data.reason
                                             }
                                         }
                                         : msg
@@ -398,6 +455,10 @@ export const useChat = () => {
         loadDocuments,
         handleRemoveDocument,
         handleSubmit,
-        submitQuery
+        submitQuery,
+        selectedModel,
+        setSelectedModel,
+        uploadedDocs,
+        setUploadedDocs,
     };
 };

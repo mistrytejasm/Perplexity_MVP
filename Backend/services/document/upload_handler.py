@@ -13,7 +13,12 @@ class DocumentUploadHandler:
     def __init__(self):
         self.upload_dir = "/tmp/uploads"
         self.allowed_extensions = {".pdf", ".txt", ".docx", ".doc"}
-        self.allowed_types = {"application/pdf", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"} 
+        self.allowed_types = {
+            "application/pdf": ".pdf",
+            "text/plain": ".txt",
+            "application/msword": ".doc",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx"
+        }
         self.max_file_size = 50 * 1024 * 1024  # 50MB
         
         try:
