@@ -56,7 +56,8 @@ export const useChat = () => {
     const loadDocuments = async () => {
         if (!sessionId) return;
         try {
-            const response = await fetch(`http://localhost:8000/documents/session/${sessionId}`);
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${apiUrl}/documents/session/${sessionId}`);
             const data = await response.json();
 
             // Deduplicate by document_id (in case same file was uploaded twice to the session)
@@ -90,7 +91,8 @@ export const useChat = () => {
 
     const handleRemoveDocument = async (documentId: string) => {
         try {
-            await fetch(`http://localhost:8000/documents/${documentId}?session_id=${sessionId}`, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            await fetch(`${apiUrl}/documents/${documentId}?session_id=${sessionId}`, {
                 method: 'DELETE'
             });
             loadDocuments(); // Refresh document list
@@ -229,7 +231,8 @@ export const useChat = () => {
                     }
                 ]);
 
-                let url = `http://localhost:8000/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}&model=${encodeURIComponent(selectedModel)}`;
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                let url = `${apiUrl}/chat_stream?message=${encodeURIComponent(userInput)}&session_id=${sessionId}&model=${encodeURIComponent(selectedModel)}`;
                 if (checkpointId) url += `&checkpoint_id=${encodeURIComponent(checkpointId)}`;
 
                 const eventSource = new EventSource(url);

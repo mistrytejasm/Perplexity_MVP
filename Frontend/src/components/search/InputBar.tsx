@@ -65,7 +65,8 @@ const InputBar: React.FC<InputBarProps> = ({
         doc.id === uploadId ? { ...doc, status: 'processing' as const } : doc
       ));
 
-      const response = await fetch('http://localhost:8000/documents/upload', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/documents/upload`, {
         method: 'POST',
         body: formData,
       });
